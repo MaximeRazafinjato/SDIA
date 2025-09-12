@@ -23,13 +23,88 @@ public class SimpleRegistrationsController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 RegistrationNumber = "REG-20250911-ABC123",
-                ApplicantName = "Jean Dupont",
+                FirstName = "Jean",
+                LastName = "Dupont",
                 Email = "jean.dupont@example.com",
                 Phone = "+33123456789",
                 Status = RegistrationStatus.Pending,
                 CreatedAt = DateTime.UtcNow.AddDays(-2),
-                SubmittedAt = DateTime.UtcNow.AddDays(-1)
+                SubmittedAt = DateTime.UtcNow.AddDays(-1),
+                OrganizationName = "SDIA Demo Organization",
+                IsMinor = false,
+                AssignedToUserName = "Admin User"
             });
+            
+            _mockRegistrations.Add(new
+            {
+                Id = Guid.NewGuid(),
+                RegistrationNumber = "REG-20250910-DEF456",
+                FirstName = "Marie",
+                LastName = "Martin",
+                Email = "marie.martin@example.com",
+                Phone = "+33987654321",
+                Status = RegistrationStatus.Draft,
+                CreatedAt = DateTime.UtcNow.AddDays(-5),
+                SubmittedAt = (DateTime?)null,
+                OrganizationName = "SDIA Demo Organization",
+                IsMinor = true,
+                AssignedToUserName = (string)null
+            });
+            
+            _mockRegistrations.Add(new
+            {
+                Id = Guid.NewGuid(),
+                RegistrationNumber = "REG-20250909-GHI789",
+                FirstName = "Pierre",
+                LastName = "Bernard",
+                Email = "pierre.bernard@example.com",
+                Phone = "+33555666777",
+                Status = RegistrationStatus.Validated,
+                CreatedAt = DateTime.UtcNow.AddDays(-10),
+                SubmittedAt = DateTime.UtcNow.AddDays(-8),
+                OrganizationName = "SDIA Demo Organization",
+                IsMinor = false,
+                AssignedToUserName = "Manager User"
+            });
+        }
+    }
+
+    /// <summary>
+    /// Get registration statistics
+    /// </summary>
+    [HttpGet("stats")]
+    [Authorize]
+    public async Task<IActionResult> GetStatistics()
+    {
+        try
+        {
+            await Task.Delay(50); // Simulate async operation
+            
+            // Calculate real statistics from mock data
+            var pendingCount = _mockRegistrations.Count(r => ((dynamic)r).Status == RegistrationStatus.Pending);
+            var validatedCount = _mockRegistrations.Count(r => ((dynamic)r).Status == RegistrationStatus.Validated);
+            var rejectedCount = _mockRegistrations.Count(r => ((dynamic)r).Status == RegistrationStatus.Rejected);
+            var draftCount = _mockRegistrations.Count(r => ((dynamic)r).Status == RegistrationStatus.Draft);
+            
+            return Ok(new
+            {
+                total = _mockRegistrations.Count,
+                pending = pendingCount,
+                validated = validatedCount,
+                rejected = rejectedCount,
+                byStatus = new[]
+                {
+                    new { status = "Pending", count = pendingCount },
+                    new { status = "Draft", count = draftCount },
+                    new { status = "Validated", count = validatedCount },
+                    new { status = "Rejected", count = rejectedCount }
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting registration statistics");
+            return StatusCode(500, new { message = "An error occurred while fetching statistics" });
         }
     }
 
@@ -117,12 +192,16 @@ public class SimpleRegistrationsController : ControllerBase
             {
                 Id = registrationId,
                 RegistrationNumber = registrationNumber,
-                ApplicantName = $"{dto.FirstName} {dto.LastName}",
+                FirstName = dto.FirstName,
+                LastName = dto.LastName,
                 Email = dto.Email,
                 Phone = dto.Phone,
                 Status = RegistrationStatus.Draft,
                 CreatedAt = DateTime.UtcNow,
-                SubmittedAt = (DateTime?)null
+                SubmittedAt = (DateTime?)null,
+                OrganizationName = "SDIA Demo Organization",
+                IsMinor = false,
+                AssignedToUserName = (string)null
             };
 
             _mockRegistrations.Add(newRegistration);

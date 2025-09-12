@@ -21,7 +21,10 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
+  Avatar,
+  Stack,
 } from '@mui/material';
+import { dataGridTheme } from '@/styles/dataGridTheme';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -179,75 +182,94 @@ const Users: React.FC = () => {
     {
       field: 'user',
       headerName: 'Utilisateur',
-      width: 250,
+      flex: 3,
+      minWidth: 350,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1 }}>
+          <Avatar 
+            sx={{ 
+              bgcolor: params.row.role === 'Admin' ? 'error.main' : 
+                      params.row.role === 'Manager' ? 'warning.main' : 'primary.main',
+              width: 45,
+              height: 45,
+              fontSize: '1rem',
+              fontWeight: 600,
+              boxShadow: 1
+            }}
+          >
+            {params.row.firstName?.[0]}{params.row.lastName?.[0]}
+          </Avatar>
+          <Box>
+            <Typography variant="body1" fontWeight="600" sx={{ mb: 0.25 }}>
+              {params.row.firstName} {params.row.lastName}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+              {params.row.email}
+            </Typography>
+            {params.row.organizationName && (
+              <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 500 }}>
+                🏢 {params.row.organizationName}
+              </Typography>
+            )}
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      field: 'roleAndStatus',
+      headerName: 'Rôle & Statut',
+      flex: 2,
+      minWidth: 200,
+      renderCell: (params) => (
+        <Stack spacing={0.5}>
+          <Chip
+            label={params.row.role}
+            color={getRoleColor(params.row.role)}
+            size="small"
+            sx={{ fontWeight: 600 }}
+          />
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Chip
+              label={params.row.isActive ? '✓ Actif' : '✗ Inactif'}
+              color={params.row.isActive ? 'success' : 'default'}
+              size="small"
+              variant="outlined"
+              sx={{ fontSize: '0.7rem', height: '20px' }}
+            />
+            <Chip
+              label={params.row.emailConfirmed ? '✉ Confirmé' : '⏳ En attente'}
+              color={params.row.emailConfirmed ? 'success' : 'warning'}
+              size="small"
+              variant="outlined"
+              sx={{ fontSize: '0.7rem', height: '20px' }}
+            />
+          </Box>
+        </Stack>
+      ),
+    },
+    {
+      field: 'dates',
+      headerName: 'Activité',
+      flex: 2,
+      minWidth: 180,
       renderCell: (params) => (
         <Box>
-          <Typography variant="body2" fontWeight="bold">
-            {params.row.firstName} {params.row.lastName}
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+            <strong>Créé:</strong> {new Date(params.row.createdAt).toLocaleDateString('fr-FR')}
           </Typography>
-          <Typography variant="caption" color="textSecondary">
-            {params.row.email}
+          <Typography variant="caption" sx={{ color: params.row.lastLoginAt ? 'success.main' : 'text.disabled' }}>
+            <strong>Connexion:</strong> {params.row.lastLoginAt ? 
+              new Date(params.row.lastLoginAt).toLocaleDateString('fr-FR') : 'Jamais'}
           </Typography>
         </Box>
       ),
     },
     {
-      field: 'role',
-      headerName: 'Rôle',
-      width: 120,
-      renderCell: (params) => (
-        <Chip
-          label={params.value}
-          color={getRoleColor(params.value)}
-          size="small"
-          variant="outlined"
-        />
-      ),
-    },
-    {
-      field: 'isActive',
-      headerName: 'Statut',
-      width: 100,
-      renderCell: (params) => (
-        <Chip
-          label={params.value ? 'Actif' : 'Inactif'}
-          color={params.value ? 'success' : 'default'}
-          size="small"
-          variant="outlined"
-        />
-      ),
-    },
-    {
-      field: 'emailConfirmed',
-      headerName: 'Email Confirmé',
-      width: 120,
-      renderCell: (params) => (
-        <Chip
-          label={params.value ? 'Confirmé' : 'En attente'}
-          color={params.value ? 'success' : 'warning'}
-          size="small"
-          variant="outlined"
-        />
-      ),
-    },
-    {
-      field: 'createdAt',
-      headerName: 'Créé le',
-      width: 120,
-      renderCell: (params) => new Date(params.value).toLocaleDateString('fr-FR'),
-    },
-    {
-      field: 'lastLoginAt',
-      headerName: 'Dernière connexion',
-      width: 150,
-      renderCell: (params) => 
-        params.value ? new Date(params.value).toLocaleDateString('fr-FR') : 'Jamais',
-    },
-    {
       field: 'actions',
       type: 'actions',
       headerName: 'Actions',
-      width: 200,
+      flex: 2,
+      minWidth: 250,
       getActions: (params) => [
         <GridActionsCellItem
           icon={
@@ -292,12 +314,31 @@ const Users: React.FC = () => {
   ];
 
   return (
-    <Box>
-      <Paper sx={{ p: 2, mb: 2 }}>
+    <Box sx={{ 
+      width: '100%', 
+      height: '100%', 
+      margin: -3, 
+      padding: 3,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden'
+    }}>
+      <Paper sx={{ 
+        p: 3, 
+        mb: 2, 
+        boxShadow: 3, 
+        borderRadius: 2, 
+        width: '100%',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        minHeight: 0
+      }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Box>
-            <Typography variant="h4" gutterBottom>
-              <PersonIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            <Typography variant="h4" gutterBottom fontWeight="bold" color="primary.dark">
+              <PersonIcon sx={{ mr: 1, verticalAlign: 'middle', fontSize: '2rem' }} />
               Gestion des Utilisateurs
             </Typography>
             <Typography variant="body2" color="textSecondary">
@@ -313,22 +354,35 @@ const Users: React.FC = () => {
           </Button>
         </Box>
 
-        <DataGrid
-          rows={usersData?.items || []}
-          columns={columns}
-          loading={isLoading}
-          paginationMode="server"
-          rowCount={usersData?.totalCount || 0}
-          paginationModel={{ page, pageSize }}
-          onPaginationModelChange={(model) => {
-            setPage(model.page);
-            setPageSize(model.pageSize);
-          }}
-          pageSizeOptions={[5, 10, 25, 50]}
-          disableRowSelectionOnClick
-          autoHeight
-          sx={{ minHeight: 400 }}
-        />
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
+          <DataGrid
+            rows={usersData?.items || []}
+            columns={columns}
+            loading={isLoading}
+            paginationMode="server"
+            rowCount={usersData?.totalCount || 0}
+            paginationModel={{ page, pageSize }}
+            onPaginationModelChange={(model) => {
+              setPage(model.page);
+              setPageSize(model.pageSize);
+            }}
+            pageSizeOptions={[5, 10, 25, 50]}
+            disableRowSelectionOnClick
+            getRowHeight={() => 'auto'}
+            sx={{ 
+              ...dataGridTheme, 
+              width: '100%', 
+              flex: 1,
+              minHeight: 0,
+              '& .MuiDataGrid-main': {
+                overflow: 'hidden'
+              },
+              '& .MuiDataGrid-virtualScroller': {
+                overflow: 'auto'
+              }
+            }}
+          />
+        </Box>
       </Paper>
 
       {/* Create User Dialog */}

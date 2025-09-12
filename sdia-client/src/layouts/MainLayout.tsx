@@ -19,11 +19,11 @@ import {
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
-  PersonAdd as PersonAddIcon,
   School as SchoolIcon,
   Logout as LogoutIcon,
   AccountCircle,
   People as PeopleIcon,
+  Assignment as AssignmentIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -57,7 +57,7 @@ const MainLayout: React.FC = () => {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Inscriptions', icon: <PersonAddIcon />, path: '/registrations' },
+    { text: 'Gestion Inscriptions', icon: <AssignmentIcon />, path: '/registrations-dashboard' },
     { text: 'Utilisateurs', icon: <PeopleIcon />, path: '/users' },
     { text: 'Cours', icon: <SchoolIcon />, path: '/courses' },
   ];
@@ -90,7 +90,7 @@ const MainLayout: React.FC = () => {
   );
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <AppBar
         position="fixed"
         sx={{
@@ -185,10 +185,16 @@ const MainLayout: React.FC = () => {
           flexGrow: 1,
           p: 3,
           width: { sm: `calc(100% - ${drawerWidth}px)` },
+          height: '100vh',
+          overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         <Toolbar />
-        <Outlet />
+        <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
+          <Outlet />
+        </Box>
       </Box>
     </Box>
   );
