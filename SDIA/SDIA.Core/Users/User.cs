@@ -21,6 +21,8 @@ public class User : BaseEntity
     public string RefreshToken { get; set; } = string.Empty;
     public DateTime? RefreshTokenExpiry { get; set; }
     public string EmailVerificationToken { get; set; } = string.Empty;
+    public string PasswordResetToken { get; set; } = string.Empty;
+    public DateTime? PasswordResetExpiry { get; set; }
     
     // Relations
     public Guid? OrganizationId { get; set; }

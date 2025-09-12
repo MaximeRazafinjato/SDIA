@@ -6,6 +6,8 @@ using System.Security.Claims;
 using SDIA.Core.Users;
 using SDIA.API.Models.Auth;
 using SDIA.API.Data;
+using SDIA.Core.Services;
+using System.Security.Cryptography;
 
 namespace SDIA.API.Controllers;
 
@@ -15,11 +17,16 @@ public class SimpleAuthController : ControllerBase
 {
     private readonly SimpleSDIADbContext _dbContext;
     private readonly ILogger<SimpleAuthController> _logger;
+    private readonly IEmailService _emailService;
 
-    public SimpleAuthController(SimpleSDIADbContext dbContext, ILogger<SimpleAuthController> logger)
+    public SimpleAuthController(
+        SimpleSDIADbContext dbContext, 
+        ILogger<SimpleAuthController> logger,
+        IEmailService emailService)
     {
         _dbContext = dbContext;
         _logger = logger;
+        _emailService = emailService;
     }
 
     [HttpPost("login")]
@@ -196,5 +203,155 @@ public class SimpleAuthController : ControllerBase
     public IActionResult Test()
     {
         return Ok(new { message = "Auth controller is working", timestamp = DateTime.UtcNow });
+    }
+
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.Email))
+            {
+                return BadRequest(new { message = "L'email est requis" });
+            }
+
+            var user = await _dbContext.Users
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
+
+            // Always return success to prevent email enumeration
+            if (user == null)
+            {
+                _logger.LogWarning("Forgot password requested for non-existent email: {Email}", request.Email);
+                return Ok(new { message = "Si l'email existe, un lien de réinitialisation a été envoyé." });
+            }
+
+            // Generate secure reset token
+            var token = GenerateSecureToken();
+            user.PasswordResetToken = token;
+            user.PasswordResetExpiry = DateTime.UtcNow.AddHours(1);
+
+            await _dbContext.SaveChangesAsync();
+
+            // Send reset email
+            var resetLink = $"http://localhost:5173/reset-password?token={token}";
+            var emailContent = $@"
+                <h2>Réinitialisation de mot de passe</h2>
+                <p>Bonjour {user.FirstName},</p>
+                <p>Vous avez demandé une réinitialisation de votre mot de passe.</p>
+                <p>Cliquez sur le lien ci-dessous pour réinitialiser votre mot de passe :</p>
+                <p><a href='{resetLink}'>Réinitialiser mon mot de passe</a></p>
+                <p>Ce lien expirera dans 1 heure.</p>
+                <p>Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
+                <br>
+                <p>Cordialement,<br>L'équipe SDIA</p>
+            ";
+
+            await _emailService.SendEmailAsync(
+                user.Email,
+                "Réinitialisation de votre mot de passe SDIA",
+                emailContent
+            );
+
+            _logger.LogInformation("Password reset email sent to {Email}", user.Email);
+            return Ok(new { message = "Si l'email existe, un lien de réinitialisation a été envoyé." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing forgot password for {Email}", request.Email);
+            return StatusCode(500, new { message = "Une erreur est survenue. Veuillez réessayer plus tard." });
+        }
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.Token) || string.IsNullOrEmpty(request.NewPassword))
+            {
+                return BadRequest(new { message = "Token et nouveau mot de passe requis" });
+            }
+
+            var user = await _dbContext.Users
+                .FirstOrDefaultAsync(u => u.PasswordResetToken == request.Token);
+
+            if (user == null)
+            {
+                _logger.LogWarning("Invalid reset token used: {Token}", request.Token);
+                return BadRequest(new { message = "Token invalide ou expiré" });
+            }
+
+            if (user.PasswordResetExpiry == null || user.PasswordResetExpiry < DateTime.UtcNow)
+            {
+                _logger.LogWarning("Expired reset token used for user: {Email}", user.Email);
+                return BadRequest(new { message = "Token invalide ou expiré" });
+            }
+
+            // Reset password
+            user.SetPassword(request.NewPassword);
+            user.PasswordResetToken = string.Empty;
+            user.PasswordResetExpiry = null;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _dbContext.SaveChangesAsync();
+
+            _logger.LogInformation("Password successfully reset for user: {Email}", user.Email);
+            return Ok(new { message = "Mot de passe réinitialisé avec succès" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resetting password");
+            return StatusCode(500, new { message = "Une erreur est survenue lors de la réinitialisation" });
+        }
+    }
+
+    [HttpGet("validate-reset-token")]
+    public async Task<IActionResult> ValidateResetToken([FromQuery] string token)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return Ok(new { isValid = false });
+            }
+
+            var user = await _dbContext.Users
+                .FirstOrDefaultAsync(u => u.PasswordResetToken == token);
+
+            if (user == null)
+            {
+                _logger.LogWarning("Invalid reset token validation attempt: {Token}", token);
+                return Ok(new { isValid = false });
+            }
+
+            var isValid = user.PasswordResetExpiry != null && user.PasswordResetExpiry > DateTime.UtcNow;
+
+            if (!isValid)
+            {
+                _logger.LogWarning("Expired reset token validation for user: {Email}", user.Email);
+            }
+
+            return Ok(new 
+            { 
+                isValid = isValid,
+                email = isValid ? user.Email : string.Empty
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error validating reset token");
+            return StatusCode(500, new { message = "Une erreur est survenue" });
+        }
+    }
+
+    private static string GenerateSecureToken()
+    {
+        var randomBytes = new byte[32];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(randomBytes);
+        return Convert.ToBase64String(randomBytes)
+            .Replace("+", "-")
+            .Replace("/", "_")
+            .Replace("=", "");
     }
 }

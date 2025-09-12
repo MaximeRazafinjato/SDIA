@@ -31,7 +31,10 @@
       "Bash(select:*)",
       "Bash(find:*)",
       "Bash(tasklist)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "mcp__atlassian__getAccessibleAtlassianResources",
+      "mcp__atlassian__searchJiraIssuesUsingJql",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

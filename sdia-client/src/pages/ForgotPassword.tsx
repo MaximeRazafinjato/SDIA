@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,83 +12,117 @@ import {
   Alert,
   Container,
   InputAdornment,
-  IconButton,
+  CircularProgress,
 } from '@mui/material';
 import {
-  Visibility,
-  VisibilityOff,
   Email as EmailIcon,
-  Lock as LockIcon,
+  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
-import { useAuth } from '@/contexts/AuthContext';
+import apiClient from '@/api/client';
 
-// Validation schema using Zod
-const loginSchema = z.object({
+// Validation schema
+const forgotPasswordSchema = z.object({
   email: z
     .string()
     .min(1, 'L\'email est requis')
     .email('Format d\'email invalide'),
-  password: z
-    .string()
-    .min(1, 'Le mot de passe est requis')
-    .min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
 });
 
-type LoginFormData = z.infer<typeof loginSchema>;
+type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
-const Login: React.FC = () => {
-  const [showPassword, setShowPassword] = useState(false);
+const ForgotPassword: React.FC = () => {
   const [error, setError] = useState<string>('');
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const [success, setSuccess] = useState<boolean>(false);
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const from = (location.state as any)?.from?.pathname || '/dashboard';
 
   const {
     control,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<ForgotPasswordFormData>({
+    resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
       email: '',
-      password: '',
     },
   });
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate(from, { replace: true });
-    }
-  }, [isAuthenticated, navigate, from]);
-
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (data: ForgotPasswordFormData) => {
     try {
       setError('');
-      await login(data.email, data.password);
-      navigate(from, { replace: true });
+      setSuccess(false);
+      
+      await apiClient.post('/api/auth/forgot-password', data);
+      
+      setSuccess(true);
     } catch (err: any) {
       setError(
         err.response?.data?.message || 
-        'Échec de la connexion. Vérifiez vos identifiants.'
+        'Une erreur est survenue. Veuillez réessayer.'
       );
     }
   };
 
-  const handleTogglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
-
-  if (isLoading) {
+  if (success) {
     return (
       <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          backgroundColor: '#f5f5f5',
+          backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        }}
       >
-        <Typography>Chargement...</Typography>
+        <Container component="main" maxWidth="sm">
+          <Paper
+            elevation={24}
+            sx={{
+              padding: 4,
+              borderRadius: 3,
+              backdropFilter: 'blur(10px)',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}
+            >
+              <Typography
+                component="h1"
+                variant="h5"
+                gutterBottom
+                sx={{
+                  fontWeight: 'bold',
+                  color: 'success.main',
+                  textAlign: 'center',
+                  mb: 3,
+                }}
+              >
+                Email envoyé !
+              </Typography>
+              
+              <Alert severity="success" sx={{ width: '100%', mb: 3 }}>
+                Si l'adresse email existe dans notre système, vous recevrez un lien de réinitialisation dans quelques minutes.
+                Pensez à vérifier votre dossier spam.
+              </Alert>
+
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={() => navigate('/login')}
+                sx={{
+                  mt: 2,
+                  py: 1.5,
+                }}
+              >
+                Retour à la connexion
+              </Button>
+            </Box>
+          </Paper>
+        </Container>
       </Box>
     );
   }
@@ -128,20 +162,21 @@ const Login: React.FC = () => {
                 fontWeight: 'bold',
                 color: 'primary.main',
                 textAlign: 'center',
-                mb: 3,
+                mb: 2,
               }}
             >
-              SDIA
+              Mot de passe oublié
             </Typography>
+            
             <Typography
-              variant="h6"
+              variant="body1"
               sx={{
                 textAlign: 'center',
                 mb: 4,
                 color: 'text.secondary',
               }}
             >
-              Système de Gestion des Inscriptions Académiques
+              Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.
             </Typography>
 
             {error && (
@@ -181,43 +216,6 @@ const Login: React.FC = () => {
                 )}
               />
 
-              <Controller
-                name="password"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    margin="normal"
-                    required
-                    fullWidth
-                    label="Mot de passe"
-                    type={showPassword ? 'text' : 'password'}
-                    id="password"
-                    autoComplete="current-password"
-                    error={!!errors.password}
-                    helperText={errors.password?.message}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LockIcon color="action" />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            aria-label="toggle password visibility"
-                            onClick={handleTogglePasswordVisibility}
-                            edge="end"
-                          >
-                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                )}
-              />
-
               <Button
                 type="submit"
                 fullWidth
@@ -231,24 +229,24 @@ const Login: React.FC = () => {
                   fontWeight: 'bold',
                 }}
               >
-                {isSubmitting ? 'Connexion...' : 'Se connecter'}
+                {isSubmitting ? (
+                  <CircularProgress size={24} color="inherit" />
+                ) : (
+                  'Envoyer le lien de réinitialisation'
+                )}
               </Button>
 
-              <Box sx={{ textAlign: 'center', mt: 2 }}>
-                <Button
-                  variant="text"
-                  onClick={() => navigate('/forgot-password')}
-                  sx={{
-                    textTransform: 'none',
-                    color: 'primary.main',
-                    '&:hover': {
-                      textDecoration: 'underline',
-                    },
-                  }}
-                >
-                  Mot de passe oublié ?
-                </Button>
-              </Box>
+              <Button
+                fullWidth
+                variant="text"
+                startIcon={<ArrowBackIcon />}
+                onClick={() => navigate('/login')}
+                sx={{
+                  mt: 1,
+                }}
+              >
+                Retour à la connexion
+              </Button>
             </Box>
           </Box>
         </Paper>
@@ -257,4 +255,4 @@ const Login: React.FC = () => {
   );
 };
 
-export default Login;
+export default ForgotPassword;

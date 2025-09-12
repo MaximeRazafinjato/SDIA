@@ -71,6 +71,9 @@ try
     // builder.Services.AddApplicationServices();
     // builder.Services.AddInfrastructureServices(builder.Configuration);
     
+    // Register email service
+    builder.Services.AddScoped<SDIA.Core.Services.IEmailService, SDIA.API.Services.SimpleEmailService>();
+    
     // Controllers
     builder.Services.AddControllers()
         .AddNewtonsoftJson(options =>
