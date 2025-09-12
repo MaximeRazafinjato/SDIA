@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -23,10 +24,10 @@ import {
   Snackbar,
   Card,
   CardContent,
-  Grid,
   Tabs,
   Tab,
   Badge,
+  Grid,
 } from '@mui/material';
 import { dataGridTheme } from '@/styles/dataGridTheme';
 import PageLayout from '@/components/layout/PageLayout';
@@ -69,6 +70,7 @@ interface RegistrationStats {
 }
 
 const RegistrationsDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -127,15 +129,8 @@ const RegistrationsDashboard: React.FC = () => {
     fetchStats();
   }, [fetchRegistrations]);
 
-  const handleViewDetails = async (id: string) => {
-    try {
-      const response = await axios.get(`/api/registrations/${id}`);
-      setSelectedRegistration(response.data);
-      setDetailDialogOpen(true);
-    } catch (error) {
-      console.error('Error fetching registration details:', error);
-      setSnackbar({ open: true, message: 'Erreur lors du chargement des détails', severity: 'error' });
-    }
+  const handleViewDetails = (id: string) => {
+    navigate(`/registrations/${id}`);
   };
 
   const handleGeneratePublicLink = async (id: string) => {
@@ -143,9 +138,11 @@ const RegistrationsDashboard: React.FC = () => {
       const response = await axios.get(`/api/registrations/${id}/public-link`);
       setPublicLink(response.data.publicLink);
       setPublicLinkDialogOpen(true);
-    } catch (error) {
+      setSnackbar({ open: true, message: response.data.message || 'Lien généré avec succès', severity: 'success' });
+    } catch (error: any) {
       console.error('Error generating public link:', error);
-      setSnackbar({ open: true, message: 'Erreur lors de la génération du lien', severity: 'error' });
+      const errorMessage = error?.response?.data?.message || error?.message || 'Erreur lors de la génération du lien';
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     }
   };
 
@@ -407,7 +404,7 @@ const RegistrationsDashboard: React.FC = () => {
       {/* Statistics Cards */}
       {stats && (
         <Grid container spacing={2} mb={3}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Card>
               <CardContent>
                 <Typography color="textSecondary" gutterBottom>
@@ -419,7 +416,7 @@ const RegistrationsDashboard: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Card>
               <CardContent>
                 <Typography color="textSecondary" gutterBottom>
@@ -431,7 +428,7 @@ const RegistrationsDashboard: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Card>
               <CardContent>
                 <Typography color="textSecondary" gutterBottom>
@@ -443,7 +440,7 @@ const RegistrationsDashboard: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Card>
               <CardContent>
                 <Typography color="textSecondary" gutterBottom>
@@ -516,12 +513,10 @@ const RegistrationsDashboard: React.FC = () => {
       <Paper 
         elevation={2} 
         sx={{ 
-          flex: 1,
-          minHeight: 0,
           width: '100%',
+          minHeight: 600,
           display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
+          flexDirection: 'column'
         }}
       >
         <DataGrid
@@ -539,6 +534,7 @@ const RegistrationsDashboard: React.FC = () => {
           checkboxSelection
           disableRowSelectionOnClick
           density="comfortable"
+          autoHeight
           sx={{...dataGridTheme,
             '& .MuiDataGrid-toolbarContainer': {
               padding: 2,
@@ -582,32 +578,32 @@ const RegistrationsDashboard: React.FC = () => {
                 <Box>
                   <Typography variant="h6" gutterBottom>Informations personnelles</Typography>
                   <Grid container spacing={2}>
-                    <Grid item xs={6}>
+                    <Grid size={6}>
                       <Typography variant="body2" color="textSecondary">Numéro d'inscription</Typography>
                       <Typography variant="body1" gutterBottom>{selectedRegistration.registrationNumber}</Typography>
                     </Grid>
-                    <Grid item xs={6}>
+                    <Grid size={6}>
                       <Typography variant="body2" color="textSecondary">Nom complet</Typography>
                       <Typography variant="body1" gutterBottom>
                         {selectedRegistration.firstName} {selectedRegistration.lastName}
                       </Typography>
                     </Grid>
-                    <Grid item xs={6}>
+                    <Grid size={6}>
                       <Typography variant="body2" color="textSecondary">Email</Typography>
                       <Typography variant="body1" gutterBottom>{selectedRegistration.email}</Typography>
                     </Grid>
-                    <Grid item xs={6}>
+                    <Grid size={6}>
                       <Typography variant="body2" color="textSecondary">Téléphone</Typography>
                       <Typography variant="body1" gutterBottom>{selectedRegistration.phone}</Typography>
                     </Grid>
-                    <Grid item xs={6}>
+                    <Grid size={6}>
                       <Typography variant="body2" color="textSecondary">Date de naissance</Typography>
                       <Typography variant="body1" gutterBottom>
                         {new Date(selectedRegistration.birthDate).toLocaleDateString('fr-FR')}
                         {selectedRegistration.isMinor && <Chip label="Mineur" size="small" color="warning" sx={{ ml: 1 }} />}
                       </Typography>
                     </Grid>
-                    <Grid item xs={6}>
+                    <Grid size={6}>
                       <Typography variant="body2" color="textSecondary">Organisation</Typography>
                       <Typography variant="body1" gutterBottom>
                         {selectedRegistration.organization?.name}

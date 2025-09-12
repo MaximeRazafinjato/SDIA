@@ -298,4 +298,189 @@ public class SimpleRegistrationsController : ControllerBase
             return StatusCode(500, new { message = "An error occurred" });
         }
     }
+
+    /// <summary>
+    /// Generate public link for registration
+    /// </summary>
+    [HttpGet("{id}/public-link")]
+    [Authorize]
+    public async Task<IActionResult> GeneratePublicLink(Guid id)
+    {
+        try
+        {
+            await Task.Delay(100); // Simulate async operation
+
+            // Generate a unique public link
+            var publicToken = Guid.NewGuid().ToString("N")[..16]; // Use first 16 characters
+            var publicLink = $"{Request.Scheme}://{Request.Host}/public/registration/{publicToken}";
+
+            _logger.LogInformation("Generated public link for registration {Id}: {Link}", id, publicLink);
+
+            return Ok(new { 
+                publicLink,
+                expiresAt = DateTime.UtcNow.AddDays(7), // Link expires in 7 days
+                message = "Lien public généré avec succès" 
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating public link for {Id}", id);
+            return StatusCode(500, new { message = "An error occurred while generating the public link" });
+        }
+    }
+
+    /// <summary>
+    /// Send reminder to user
+    /// </summary>
+    [HttpPost("{id}/remind")]
+    [Authorize]
+    public async Task<IActionResult> RemindUser(Guid id, [FromBody] RegistrationActionDto dto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            await Task.Delay(100); // Simulate async operation
+
+            // In production, would get registration and send email/SMS
+            _logger.LogInformation("Sending reminder for registration {Id} with comment: {Comment}", id, dto.Comment);
+
+            // Simulate sending email/SMS
+            // await _emailService.SendEmailAsync(registration.Email, "Rappel: Complétez votre dossier", emailContent);
+            // await _smsService.SendSmsAsync(registration.Phone, smsContent);
+
+            return Ok(new { 
+                message = "Relance envoyée avec succès",
+                notificationsSent = new[] { "email", "sms" }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending reminder for {Id}", id);
+            return StatusCode(500, new { message = "An error occurred while sending the reminder" });
+        }
+    }
+
+    /// <summary>
+    /// Validate registration
+    /// </summary>
+    [HttpPost("{id}/validate")]
+    [Authorize]
+    public async Task<IActionResult> ValidateRegistration(Guid id, [FromBody] RegistrationActionDto dto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            await Task.Delay(100); // Simulate async operation
+
+            // Update status to Validated
+            var registration = _mockRegistrations.FirstOrDefault(r => ((dynamic)r).Id == id);
+            if (registration != null)
+            {
+                ((dynamic)registration).Status = RegistrationStatus.Validated;
+            }
+
+            _logger.LogInformation("Validating registration {Id} with comment: {Comment}", id, dto.Comment);
+
+            // Simulate sending email/SMS
+            // await _emailService.SendEmailAsync(registration.Email, "Votre dossier a été validé", emailContent);
+            // await _smsService.SendSmsAsync(registration.Phone, smsContent);
+
+            return Ok(new { 
+                message = "Dossier validé avec succès",
+                newStatus = "Validated",
+                notificationsSent = new[] { "email", "sms" }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error validating registration {Id}", id);
+            return StatusCode(500, new { message = "An error occurred while validating the registration" });
+        }
+    }
+
+    /// <summary>
+    /// Reject registration
+    /// </summary>
+    [HttpPost("{id}/reject")]
+    [Authorize]
+    public async Task<IActionResult> RejectRegistration(Guid id, [FromBody] RegistrationActionDto dto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Comment))
+            {
+                return BadRequest(new { message = "Une raison de rejet est requise" });
+            }
+
+            await Task.Delay(100); // Simulate async operation
+
+            // Update status to Rejected
+            var registration = _mockRegistrations.FirstOrDefault(r => ((dynamic)r).Id == id);
+            if (registration != null)
+            {
+                ((dynamic)registration).Status = RegistrationStatus.Rejected;
+            }
+
+            _logger.LogInformation("Rejecting registration {Id} with reason: {Comment}", id, dto.Comment);
+
+            // Simulate sending email/SMS
+            // await _emailService.SendEmailAsync(registration.Email, "Votre dossier a été rejeté", emailContent);
+            // await _smsService.SendSmsAsync(registration.Phone, smsContent);
+
+            return Ok(new { 
+                message = "Dossier rejeté",
+                newStatus = "Rejected",
+                rejectionReason = dto.Comment,
+                notificationsSent = new[] { "email", "sms" }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error rejecting registration {Id}", id);
+            return StatusCode(500, new { message = "An error occurred while rejecting the registration" });
+        }
+    }
+
+    /// <summary>
+    /// Update registration details
+    /// </summary>
+    [HttpPut("{id}")]
+    [Authorize]
+    public async Task<IActionResult> UpdateRegistration(Guid id, [FromBody] dynamic registrationData)
+    {
+        try
+        {
+            await Task.Delay(100); // Simulate async operation
+
+            // Find and update the registration
+            var registration = _mockRegistrations.FirstOrDefault(r => ((dynamic)r).Id == id);
+            if (registration == null)
+            {
+                return NotFound();
+            }
+
+            // In production, would properly map and validate the update
+            _logger.LogInformation("Updating registration {Id}", id);
+
+            return Ok(new { message = "Registration updated successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating registration {Id}", id);
+            return StatusCode(500, new { message = "An error occurred while updating the registration" });
+        }
+    }
 }

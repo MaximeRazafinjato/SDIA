@@ -192,9 +192,7 @@ const MainLayout: React.FC = () => {
         }}
       >
         <Toolbar />
-        <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-          <Outlet />
-        </Box>
+        <Outlet />
       </Box>
     </Box>
   );

@@ -19,12 +19,9 @@ const PageLayout: React.FC<PageLayoutProps> = ({
   return (
     <Box sx={{ 
       width: '100%', 
-      height: '100%', 
-      margin: -3, 
-      padding: 3,
+      minHeight: '100%',
       display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden'
+      flexDirection: 'column'
     }}>
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -51,7 +48,11 @@ const PageLayout: React.FC<PageLayoutProps> = ({
       </Box>
 
       {/* Content */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Box sx={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column'
+      }}>
         {children}
       </Box>
     </Box>

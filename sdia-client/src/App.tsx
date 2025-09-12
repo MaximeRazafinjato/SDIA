@@ -11,6 +11,7 @@ import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import Dashboard from '@/pages/Dashboard';
 import RegistrationsDashboard from '@/pages/RegistrationsDashboard';
+import RegistrationDetail from '@/pages/RegistrationDetail';
 import Users from '@/pages/Users';
 
 // Create a Material-UI theme
@@ -58,6 +59,7 @@ const App: React.FC = () => {
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="registrations-dashboard" element={<RegistrationsDashboard />} />
+                <Route path="registrations/:id" element={<RegistrationDetail />} />
                 <Route path="users" element={<Users />} />
                 <Route path="courses" element={<div>Cours - À venir</div>} />
               </Route>

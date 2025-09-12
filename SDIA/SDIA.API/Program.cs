@@ -18,9 +18,9 @@ try
     builder.Host.UseSerilog();
 
     // Add services to the container.
-    // Database configuration - using InMemory for development (SQL Server connection issue)
+    // Database configuration - using SQL Server for persistence
     builder.Services.AddDbContext<SimpleSDIADbContext>(options =>
-        options.UseInMemoryDatabase("SDIA_DevDB"));
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
     
     // CORS for development
     if (builder.Environment.IsDevelopment())
@@ -114,12 +114,13 @@ try
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<SimpleSDIADbContext>();
             
-            // For InMemory, no need to ensure created
+            // Apply migrations for SQL Server - commented since migrations are already applied
+            // await dbContext.Database.MigrateAsync();
             
             // Initialize with seed data
             await SimpleDbInitializer.InitializeAsync(scope.ServiceProvider);
             
-            Log.Information("Database initialized successfully with InMemory");
+            Log.Information("Database initialized successfully with SQL Server");
         }
         catch (Exception ex)
         {

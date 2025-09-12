@@ -11,8 +11,8 @@ public static class SimpleDbInitializer
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<SimpleSDIADbContext>();
         
-        // Ensure database is created
-        await context.Database.EnsureCreatedAsync();
+        // Ensure database is created - commented out since database already exists
+        // await context.Database.EnsureCreatedAsync();
         
         // Check if we already have data
         if (await context.Users.AnyAsync())
