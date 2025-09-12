@@ -1,0 +1,6 @@
+@SDIA.API_HostAddress = http://localhost:5206
+
+GET {{SDIA.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
