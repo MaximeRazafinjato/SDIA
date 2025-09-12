@@ -29,6 +29,7 @@ import {
   Badge,
 } from '@mui/material';
 import { dataGridTheme } from '@/styles/dataGridTheme';
+import PageLayout from '@/components/layout/PageLayout';
 import {
   Search as SearchIcon,
   FilterList as FilterIcon,
@@ -385,26 +386,11 @@ const RegistrationsDashboard: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ 
-      width: '100%', 
-      height: '100%', 
-      margin: -3, 
-      padding: 3,
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden'
-    }}>
-      {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" component="h1" fontWeight="bold" color="primary.dark" gutterBottom>
-            <AssignmentIcon sx={{ mr: 1, verticalAlign: 'middle', fontSize: '2rem' }} />
-            Gestion des Inscriptions
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            Gérez les inscriptions et candidatures de la plateforme
-          </Typography>
-        </Box>
+    <PageLayout 
+      title="Gestion des Inscriptions" 
+      description="Gérez les inscriptions et candidatures de la plateforme"
+      icon={<AssignmentIcon />}
+      actions={
         <Button
           variant="contained"
           startIcon={<RefreshIcon />}
@@ -415,7 +401,8 @@ const RegistrationsDashboard: React.FC = () => {
         >
           Actualiser
         </Button>
-      </Box>
+      }
+    >
 
       {/* Statistics Cards */}
       {stats && (
@@ -796,7 +783,7 @@ const RegistrationsDashboard: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </PageLayout>
   );
 };
 

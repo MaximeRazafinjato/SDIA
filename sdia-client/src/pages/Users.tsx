@@ -25,6 +25,7 @@ import {
   Stack,
 } from '@mui/material';
 import { dataGridTheme } from '@/styles/dataGridTheme';
+import PageLayout from '@/components/layout/PageLayout';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -314,18 +315,22 @@ const Users: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ 
-      width: '100%', 
-      height: '100%', 
-      margin: -3, 
-      padding: 3,
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden'
-    }}>
+    <PageLayout 
+      title="Gestion des Utilisateurs" 
+      description="Gérez les comptes utilisateurs de la plateforme"
+      icon={<PersonIcon />}
+      actions={
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setCreateDialogOpen(true)}
+        >
+          Nouvel Utilisateur
+        </Button>
+      }
+    >
       <Paper sx={{ 
         p: 3, 
-        mb: 2, 
         boxShadow: 3, 
         borderRadius: 2, 
         width: '100%',
@@ -335,24 +340,6 @@ const Users: React.FC = () => {
         overflow: 'hidden',
         minHeight: 0
       }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Box>
-            <Typography variant="h4" gutterBottom fontWeight="bold" color="primary.dark">
-              <PersonIcon sx={{ mr: 1, verticalAlign: 'middle', fontSize: '2rem' }} />
-              Gestion des Utilisateurs
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Gérez les comptes utilisateurs de la plateforme
-            </Typography>
-          </Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setCreateDialogOpen(true)}
-          >
-            Nouvel Utilisateur
-          </Button>
-        </Box>
 
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
           <DataGrid
@@ -668,7 +655,7 @@ const Users: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </PageLayout>
   );
 };
 

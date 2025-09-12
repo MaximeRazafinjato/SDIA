@@ -14,7 +14,9 @@ import {
   TrendingUp as TrendingUpIcon,
   Assignment as AssignmentIcon,
   Refresh as RefreshIcon,
+  Dashboard as DashboardIcon,
 } from '@mui/icons-material';
+import PageLayout from '@/components/layout/PageLayout';
 import {
   BarChart,
   Bar,
@@ -100,16 +102,16 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <Box>
-      {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-          Tableau de bord
-        </Typography>
-        <IconButton onClick={handleRefresh} size="large">
+    <PageLayout 
+      title="Tableau de bord" 
+      description="Vue d'ensemble des activités et statistiques de la plateforme"
+      icon={<DashboardIcon />}
+      actions={
+        <IconButton onClick={handleRefresh} size="large" color="primary">
           <RefreshIcon />
         </IconButton>
-      </Box>
+      }
+    >
 
       {/* Statistics Cards */}
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={4} sx={{ flexWrap: 'wrap' }}>
@@ -236,7 +238,7 @@ const Dashboard: React.FC = () => {
           </ResponsiveContainer>
         </Paper>
       </Stack>
-    </Box>
+    </PageLayout>
   );
 };
 
