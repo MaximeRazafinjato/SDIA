@@ -12,8 +12,8 @@ using SDIA.API.Data;
 namespace SDIA.API.Migrations
 {
     [DbContext(typeof(SDIADbContext))]
-    [Migration("20250912140117_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20250912150300_AddRegistrationsTables")]
+    partial class AddRegistrationsTables
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -240,7 +240,7 @@ namespace SDIA.API.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("FormTemplate");
+                    b.ToTable("FormTemplates");
                 });
 
             modelBuilder.Entity("SDIA.Core.Organizations.Organization", b =>
@@ -404,7 +404,7 @@ namespace SDIA.API.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Registration");
+                    b.ToTable("Registrations");
                 });
 
             modelBuilder.Entity("SDIA.Core.Registrations.RegistrationComment", b =>
@@ -441,7 +441,7 @@ namespace SDIA.API.Migrations
 
                     b.HasIndex("RegistrationId");
 
-                    b.ToTable("RegistrationComment");
+                    b.ToTable("RegistrationComments");
                 });
 
             modelBuilder.Entity("SDIA.Core.Registrations.RegistrationHistory", b =>

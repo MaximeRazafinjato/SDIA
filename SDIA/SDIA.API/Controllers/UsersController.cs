@@ -14,11 +14,11 @@ namespace SDIA.API.Controllers;
 [Authorize]
 public class UsersController : ControllerBase
 {
-    private readonly SimpleSDIADbContext _context;
+    private readonly SDIADbContext _context;
     private readonly ILogger<UsersController> _logger;
     private readonly IConfiguration _configuration;
 
-    public UsersController(SimpleSDIADbContext context, ILogger<UsersController> logger, IConfiguration configuration)
+    public UsersController(SDIADbContext context, ILogger<UsersController> logger, IConfiguration configuration)
     {
         _context = context;
         _logger = logger;

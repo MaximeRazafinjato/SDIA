@@ -4,12 +4,12 @@ using SDIA.Core.Services;
 
 namespace SDIA.API.Services;
 
-public class SimpleEmailService : IEmailService
+public class EmailService : IEmailService
 {
     private readonly IConfiguration _configuration;
-    private readonly ILogger<SimpleEmailService> _logger;
+    private readonly ILogger<EmailService> _logger;
 
-    public SimpleEmailService(IConfiguration configuration, ILogger<SimpleEmailService> logger)
+    public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
     {
         _configuration = configuration;
         _logger = logger;

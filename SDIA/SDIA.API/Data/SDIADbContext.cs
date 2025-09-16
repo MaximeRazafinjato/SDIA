@@ -1,17 +1,22 @@
 using Microsoft.EntityFrameworkCore;
 using SDIA.Core.Users;
 using SDIA.Core.Organizations;
+using SDIA.Core.FormTemplates;
+using SDIA.Core.Registrations;
 
 namespace SDIA.API.Data;
 
-public class SimpleSDIADbContext : DbContext
+public class SDIADbContext : DbContext
 {
-    public SimpleSDIADbContext(DbContextOptions<SimpleSDIADbContext> options) : base(options)
+    public SDIADbContext(DbContextOptions<SDIADbContext> options) : base(options)
     {
     }
 
     public DbSet<Organization> Organizations { get; set; }
     public DbSet<User> Users { get; set; }
+    public DbSet<FormTemplate> FormTemplates { get; set; }
+    public DbSet<Registration> Registrations { get; set; }
+    public DbSet<RegistrationComment> RegistrationComments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

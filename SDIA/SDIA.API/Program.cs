@@ -19,7 +19,7 @@ try
 
     // Add services to the container.
     // Database configuration - using SQL Server for persistence
-    builder.Services.AddDbContext<SimpleSDIADbContext>(options =>
+    builder.Services.AddDbContext<SDIADbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
     
     // CORS for development
@@ -29,7 +29,7 @@ try
         {
             options.AddPolicy("DevelopmentPolicy",
                 policy => policy
-                    .WithOrigins("https://localhost:5173", "http://localhost:5173")
+                    .WithOrigins("https://localhost:5173", "http://localhost:5173", "https://localhost:5174", "http://localhost:5174")
                     .AllowCredentials()
                     .AllowAnyHeader()
                     .AllowAnyMethod());
@@ -72,7 +72,7 @@ try
     // builder.Services.AddInfrastructureServices(builder.Configuration);
     
     // Register email service
-    builder.Services.AddScoped<SDIA.Core.Services.IEmailService, SDIA.API.Services.SimpleEmailService>();
+    builder.Services.AddScoped<SDIA.Core.Services.IEmailService, SDIA.API.Services.EmailService>();
     
     // Controllers
     builder.Services.AddControllers()
@@ -112,13 +112,13 @@ try
     {
         try
         {
-            var dbContext = scope.ServiceProvider.GetRequiredService<SimpleSDIADbContext>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<SDIADbContext>();
             
-            // Apply migrations for SQL Server - commented since migrations are already applied
-            // await dbContext.Database.MigrateAsync();
+            // Apply migrations for SQL Server
+            await dbContext.Database.MigrateAsync();
             
             // Initialize with seed data
-            await SimpleDbInitializer.InitializeAsync(scope.ServiceProvider);
+            await DbInitializer.InitializeAsync(scope.ServiceProvider);
             
             Log.Information("Database initialized successfully with SQL Server");
         }

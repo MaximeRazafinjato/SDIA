@@ -15,12 +15,12 @@ namespace SDIA.API.Controllers;
 [Route("api/auth")]
 public class SimpleAuthController : ControllerBase
 {
-    private readonly SimpleSDIADbContext _dbContext;
+    private readonly SDIADbContext _dbContext;
     private readonly ILogger<SimpleAuthController> _logger;
     private readonly IEmailService _emailService;
 
     public SimpleAuthController(
-        SimpleSDIADbContext dbContext, 
+        SDIADbContext dbContext, 
         ILogger<SimpleAuthController> logger,
         IEmailService emailService)
     {

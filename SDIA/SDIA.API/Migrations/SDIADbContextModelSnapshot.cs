@@ -10,8 +10,8 @@ using SDIA.API.Data;
 
 namespace SDIA.API.Migrations
 {
-    [DbContext(typeof(SimpleSDIADbContext))]
-    partial class SimpleSDIADbContextModelSnapshot : ModelSnapshot
+    [DbContext(typeof(SDIADbContext))]
+    partial class SDIADbContextModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
@@ -237,7 +237,7 @@ namespace SDIA.API.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("FormTemplate");
+                    b.ToTable("FormTemplates");
                 });
 
             modelBuilder.Entity("SDIA.Core.Organizations.Organization", b =>
@@ -401,7 +401,7 @@ namespace SDIA.API.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Registration");
+                    b.ToTable("Registrations");
                 });
 
             modelBuilder.Entity("SDIA.Core.Registrations.RegistrationComment", b =>
@@ -438,7 +438,7 @@ namespace SDIA.API.Migrations
 
                     b.HasIndex("RegistrationId");
 
-                    b.ToTable("RegistrationComment");
+                    b.ToTable("RegistrationComments");
                 });
 
             modelBuilder.Entity("SDIA.Core.Registrations.RegistrationHistory", b =>
