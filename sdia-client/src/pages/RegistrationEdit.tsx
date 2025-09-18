@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -47,7 +47,31 @@ const RegistrationEdit: React.FC = () => {
   const sessionToken = location.state?.sessionToken || '';
   const isVerified = location.state?.verified || false;
 
-  const { control, handleSubmit, reset, formState: { errors, isDirty } } = useForm<RegistrationData>();
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors, isDirty },
+  } = useForm<RegistrationData>();
+
+  const fetchRegistration = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/public/registration/${id}/details`, {
+        params: { sessionToken },
+      });
+
+      setRegistration(response.data);
+      reset(response.data);
+      setLoading(false);
+    } catch (err: unknown) {
+      const errorMessage =
+        err && typeof err === 'object' && 'response' in err
+          ? (err.response as { data?: { error?: string } })?.data?.error
+          : undefined;
+      setError(errorMessage || "Impossible de charger l'inscription");
+      setLoading(false);
+    }
+  }, [id, sessionToken, reset]);
 
   useEffect(() => {
     if (!sessionToken || !isVerified) {
@@ -57,23 +81,7 @@ const RegistrationEdit: React.FC = () => {
     }
 
     fetchRegistration();
-  }, [id, sessionToken]);
-
-  const fetchRegistration = async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/public/registration/${id}/details`,
-        { params: { sessionToken } }
-      );
-
-      setRegistration(response.data);
-      reset(response.data);
-      setLoading(false);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Impossible de charger l\'inscription');
-      setLoading(false);
-    }
-  };
+  }, [fetchRegistration, isVerified, navigate, sessionToken]);
 
   const onSubmit = async (data: RegistrationData) => {
     setSaving(true);
@@ -81,23 +89,25 @@ const RegistrationEdit: React.FC = () => {
     setSuccess('');
 
     try {
-      const response = await axios.put(
-        `${API_BASE_URL}/api/public/registration/${id}`,
-        data,
-        { params: { sessionToken } }
-      );
+      const response = await axios.put(`${API_BASE_URL}/api/public/registration/${id}`, data, {
+        params: { sessionToken },
+      });
 
       if (response.data.success) {
         setSuccess('Inscription mise à jour avec succès !');
         reset(data);
-        
+
         // Optionally redirect after success
         setTimeout(() => {
           setSuccess('Merci pour votre mise à jour. Vous pouvez fermer cette page.');
         }, 2000);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Erreur lors de la mise à jour');
+    } catch (err: unknown) {
+      const errorMessage =
+        err && typeof err === 'object' && 'response' in err
+          ? (err.response as { data?: { error?: string } })?.data?.error
+          : undefined;
+      setError(errorMessage || 'Erreur lors de la mise à jour');
     } finally {
       setSaving(false);
     }
@@ -105,12 +115,7 @@ const RegistrationEdit: React.FC = () => {
 
   if (loading) {
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
         <CircularProgress />
       </Box>
     );
@@ -118,15 +123,8 @@ const RegistrationEdit: React.FC = () => {
 
   if (!registration) {
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
-        <Alert severity="error">
-          {error || 'Inscription non trouvée'}
-        </Alert>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <Alert severity="error">{error || 'Inscription non trouvée'}</Alert>
       </Box>
     );
   }
@@ -151,11 +149,7 @@ const RegistrationEdit: React.FC = () => {
           )}
 
           {success && (
-            <Alert
-              severity="success"
-              sx={{ mb: 2 }}
-              icon={<CheckCircle />}
-            >
+            <Alert severity="success" sx={{ mb: 2 }} icon={<CheckCircle />}>
               {success}
             </Alert>
           )}
@@ -168,7 +162,7 @@ const RegistrationEdit: React.FC = () => {
 
           <form onSubmit={handleSubmit(onSubmit)}>
             <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Controller
                   name="firstName"
                   control={control}
@@ -186,7 +180,7 @@ const RegistrationEdit: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Controller
                   name="lastName"
                   control={control}
@@ -204,16 +198,16 @@ const RegistrationEdit: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Controller
                   name="email"
                   control={control}
                   rules={{
-                    required: 'L\'email est requis',
+                    required: "L'email est requis",
                     pattern: {
                       value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                      message: 'Email invalide'
-                    }
+                      message: 'Email invalide',
+                    },
                   }}
                   render={({ field }) => (
                     <TextField
@@ -229,11 +223,13 @@ const RegistrationEdit: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Controller
                   name="phone"
                   control={control}
-                  rules={{ required: 'Le téléphone est requis' }}
+                  rules={{
+                    required: 'Le téléphone est requis',
+                  }}
                   render={({ field }) => (
                     <TextField
                       {...field}
@@ -247,11 +243,13 @@ const RegistrationEdit: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Controller
                   name="dateOfBirth"
                   control={control}
-                  rules={{ required: 'La date de naissance est requise' }}
+                  rules={{
+                    required: 'La date de naissance est requise',
+                  }}
                   render={({ field }) => (
                     <TextField
                       {...field}
@@ -267,14 +265,14 @@ const RegistrationEdit: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={12}>
+              <Grid size={12}>
                 <Divider sx={{ my: 2 }} />
                 <Typography variant="h6" gutterBottom>
                   Adresse
                 </Typography>
               </Grid>
 
-              <Grid item xs={12}>
+              <Grid size={12}>
                 <Controller
                   name="address"
                   control={control}
@@ -291,7 +289,7 @@ const RegistrationEdit: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Controller
                   name="city"
                   control={control}
@@ -306,7 +304,7 @@ const RegistrationEdit: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={12} sm={3}>
+              <Grid size={{ xs: 12, sm: 3 }}>
                 <Controller
                   name="postalCode"
                   control={control}
@@ -321,23 +319,18 @@ const RegistrationEdit: React.FC = () => {
                 />
               </Grid>
 
-              <Grid item xs={12} sm={3}>
+              <Grid size={{ xs: 12, sm: 3 }}>
                 <Controller
                   name="country"
                   control={control}
                   render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="Pays"
-                      disabled={!registration.canEdit}
-                    />
+                    <TextField {...field} fullWidth label="Pays" disabled={!registration.canEdit} />
                   )}
                 />
               </Grid>
 
               {registration.additionalData && (
-                <Grid item xs={12}>
+                <Grid size={12}>
                   <Controller
                     name="additionalData"
                     control={control}
@@ -357,7 +350,14 @@ const RegistrationEdit: React.FC = () => {
             </Grid>
 
             {registration.canEdit && (
-              <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+              <Box
+                sx={{
+                  mt: 3,
+                  display: 'flex',
+                  gap: 2,
+                  justifyContent: 'flex-end',
+                }}
+              >
                 <Button
                   variant="outlined"
                   startIcon={<Cancel />}

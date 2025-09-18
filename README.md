@@ -79,8 +79,8 @@ dotnet run --project SDIA.API
 ### Frontend
 ```bash
 cd sdia-client
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 ### Configuration

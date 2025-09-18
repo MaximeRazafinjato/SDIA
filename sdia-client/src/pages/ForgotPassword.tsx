@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,18 +14,12 @@ import {
   InputAdornment,
   CircularProgress,
 } from '@mui/material';
-import {
-  Email as EmailIcon,
-  ArrowBack as ArrowBackIcon,
-} from '@mui/icons-material';
+import { Email as EmailIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import apiClient from '@/api/client';
 
 // Validation schema
 const forgotPasswordSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'L\'email est requis')
-    .email('Format d\'email invalide'),
+  email: z.string().min(1, "L'email est requis").email("Format d'email invalide"),
 });
 
 type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
@@ -50,15 +44,16 @@ const ForgotPassword: React.FC = () => {
     try {
       setError('');
       setSuccess(false);
-      
+
       await apiClient.post('/api/auth/forgot-password', data);
-      
+
       setSuccess(true);
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message || 
-        'Une erreur est survenue. Veuillez réessayer.'
-      );
+    } catch (err: unknown) {
+      const errorMessage =
+        err && typeof err === 'object' && 'response' in err
+          ? (err.response as { data?: { message?: string } })?.data?.message
+          : undefined;
+      setError(errorMessage || 'Une erreur est survenue. Veuillez réessayer.');
     }
   };
 
@@ -103,10 +98,10 @@ const ForgotPassword: React.FC = () => {
               >
                 Email envoyé !
               </Typography>
-              
+
               <Alert severity="success" sx={{ width: '100%', mb: 3 }}>
-                Si l'adresse email existe dans notre système, vous recevrez un lien de réinitialisation dans quelques minutes.
-                Pensez à vérifier votre dossier spam.
+                Si l'adresse email existe dans notre système, vous recevrez un lien de
+                réinitialisation dans quelques minutes. Pensez à vérifier votre dossier spam.
               </Alert>
 
               <Button
@@ -167,7 +162,7 @@ const ForgotPassword: React.FC = () => {
             >
               Mot de passe oublié
             </Typography>
-            
+
             <Typography
               variant="body1"
               sx={{
@@ -176,7 +171,8 @@ const ForgotPassword: React.FC = () => {
                 color: 'text.secondary',
               }}
             >
-              Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.
+              Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot
+              de passe.
             </Typography>
 
             {error && (
@@ -185,11 +181,7 @@ const ForgotPassword: React.FC = () => {
               </Alert>
             )}
 
-            <Box
-              component="form"
-              onSubmit={handleSubmit(onSubmit)}
-              sx={{ width: '100%' }}
-            >
+            <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ width: '100%' }}>
               <Controller
                 name="email"
                 control={control}

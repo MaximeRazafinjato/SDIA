@@ -8,7 +8,7 @@ export const formatDate = (dateString: string): string => {
   try {
     const date = new Date(dateString);
     return format(date, 'dd/MM/yyyy', { locale: fr });
-  } catch (error) {
+  } catch {
     return dateString;
   }
 };
@@ -20,7 +20,7 @@ export const formatDateTime = (dateString: string): string => {
   try {
     const date = new Date(dateString);
     return format(date, 'dd/MM/yyyy HH:mm', { locale: fr });
-  } catch (error) {
+  } catch {
     return dateString;
   }
 };

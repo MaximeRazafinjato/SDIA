@@ -48,7 +48,19 @@
       "mcp__puppeteer__puppeteer_screenshot",
       "mcp__puppeteer__puppeteer_fill",
       "mcp__puppeteer__puppeteer_click",
-      "mcp__puppeteer__puppeteer_evaluate"
+      "mcp__puppeteer__puppeteer_evaluate",
+      "Bash(npm run lint)",
+      "Bash(git config:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx prettier:*)",
+      "Bash(npm run format:*)",
+      "Bash(pnpm run dev:*)",
+      "Bash(/bashes)",
+      "Bash(pnpm run lint:*)",
+      "Bash(npx eslint:*)",
+      "Bash(pnpm run:*)",
+      "Bash(pnpm list:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

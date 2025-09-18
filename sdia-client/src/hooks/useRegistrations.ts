@@ -30,7 +30,7 @@ export const useRegistration = (id: string) => {
 // Create a new registration
 export const useCreateRegistration = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (registration: Omit<Registration, 'id'>): Promise<Registration> => {
       const response = await apiClient.post('/api/registrations', registration);
@@ -45,9 +45,15 @@ export const useCreateRegistration = () => {
 // Update a registration
 export const useUpdateRegistration = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, registration }: { id: string; registration: Partial<Registration> }): Promise<Registration> => {
+    mutationFn: async ({
+      id,
+      registration,
+    }: {
+      id: string;
+      registration: Partial<Registration>;
+    }): Promise<Registration> => {
       const response = await apiClient.put(`/api/registrations/${id}`, registration);
       return response.data;
     },
@@ -61,9 +67,15 @@ export const useUpdateRegistration = () => {
 // Update registration status
 export const useUpdateRegistrationStatus = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: RegistrationStatus }): Promise<Registration> => {
+    mutationFn: async ({
+      id,
+      status,
+    }: {
+      id: string;
+      status: RegistrationStatus;
+    }): Promise<Registration> => {
       const response = await apiClient.patch(`/api/registrations/${id}/status`, { status });
       return response.data;
     },
@@ -77,7 +89,7 @@ export const useUpdateRegistrationStatus = () => {
 // Delete a registration
 export const useDeleteRegistration = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
       await apiClient.delete(`/api/registrations/${id}`);

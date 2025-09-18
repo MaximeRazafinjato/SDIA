@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -17,7 +17,6 @@ import {
   Card,
   CardContent,
   Divider,
-  IconButton,
   Stack,
   Select,
   MenuItem,
@@ -38,7 +37,6 @@ import {
 } from '@mui/lab';
 import PageLayout from '@/components/layout/PageLayout';
 import {
-  ArrowBack as ArrowBackIcon,
   Edit as EditIcon,
   Save as SaveIcon,
   Cancel as CancelIcon,
@@ -51,7 +49,6 @@ import {
   Business as BusinessIcon,
   Assignment as AssignmentIcon,
   History as HistoryIcon,
-  AttachFile as AttachFileIcon,
   NavigateNext as NavigateNextIcon,
 } from '@mui/icons-material';
 import axios from '@/api/axios';
@@ -159,7 +156,9 @@ const getStatusLabel = (status: number) => {
 };
 
 const getStatusColor = (status: number) => {
-  const colorMap: { [key: number]: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' } = {
+  const colorMap: {
+    [key: number]: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
+  } = {
     0: 'default',
     1: 'warning',
     2: 'info',
@@ -180,18 +179,18 @@ const RegistrationDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState<Registration | null>(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
-  
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error',
+  });
+
   // Action dialogs
   const [remindDialog, setRemindDialog] = useState(false);
   const [validateDialog, setValidateDialog] = useState(false);
   const [rejectDialog, setRejectDialog] = useState(false);
 
-  useEffect(() => {
-    fetchRegistration();
-  }, [id]);
-
-  const fetchRegistration = async () => {
+  const fetchRegistration = useCallback(async () => {
     setLoading(true);
     try {
       const response = await axios.get(`/api/registrations/${id}`);
@@ -199,11 +198,19 @@ const RegistrationDetail: React.FC = () => {
       setEditedData(response.data);
     } catch (error) {
       console.error('Error fetching registration:', error);
-      setSnackbar({ open: true, message: 'Erreur lors du chargement du dossier', severity: 'error' });
+      setSnackbar({
+        open: true,
+        message: 'Erreur lors du chargement du dossier',
+        severity: 'error',
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchRegistration();
+  }, [fetchRegistration]);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -216,7 +223,7 @@ const RegistrationDetail: React.FC = () => {
 
   const handleSave = async () => {
     if (!editedData) return;
-    
+
     try {
       await axios.put(`/api/registrations/${id}`, editedData);
       setRegistration(editedData);
@@ -228,7 +235,7 @@ const RegistrationDetail: React.FC = () => {
     }
   };
 
-  const handleFieldChange = (field: keyof Registration, value: any) => {
+  const handleFieldChange = (field: keyof Registration, value: string | number | boolean) => {
     if (editedData) {
       setEditedData({ ...editedData, [field]: value });
     }
@@ -241,7 +248,11 @@ const RegistrationDetail: React.FC = () => {
       setRemindDialog(false);
     } catch (error) {
       console.error('Error sending reminder:', error);
-      setSnackbar({ open: true, message: 'Erreur lors de l\'envoi de la relance', severity: 'error' });
+      setSnackbar({
+        open: true,
+        message: "Erreur lors de l'envoi de la relance",
+        severity: 'error',
+      });
     }
   };
 
@@ -272,7 +283,9 @@ const RegistrationDetail: React.FC = () => {
   if (loading) {
     return (
       <PageLayout title="Détail du dossier" icon={<AssignmentIcon />}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
+        <Box
+          sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}
+        >
           <CircularProgress />
         </Box>
       </PageLayout>
@@ -321,21 +334,13 @@ const RegistrationDetail: React.FC = () => {
               >
                 Rejeter
               </Button>
-              <Button
-                variant="contained"
-                startIcon={<EditIcon />}
-                onClick={handleEdit}
-              >
+              <Button variant="contained" startIcon={<EditIcon />} onClick={handleEdit}>
                 Modifier
               </Button>
             </>
           ) : (
             <>
-              <Button
-                variant="outlined"
-                startIcon={<CancelIcon />}
-                onClick={handleCancelEdit}
-              >
+              <Button variant="outlined" startIcon={<CancelIcon />} onClick={handleCancelEdit}>
                 Annuler
               </Button>
               <Button
@@ -650,7 +655,9 @@ const RegistrationDetail: React.FC = () => {
                     <TimelineContent>
                       <Typography variant="subtitle2">Soumis</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {format(new Date(registration.submittedAt), 'dd/MM/yyyy HH:mm', { locale: fr })}
+                        {format(new Date(registration.submittedAt), 'dd/MM/yyyy HH:mm', {
+                          locale: fr,
+                        })}
                       </Typography>
                     </TimelineContent>
                   </TimelineItem>
@@ -698,7 +705,10 @@ const RegistrationDetail: React.FC = () => {
         autoHideDuration={6000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
       >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>

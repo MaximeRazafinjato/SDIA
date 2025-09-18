@@ -20,7 +20,7 @@ apiClient.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Flag to prevent multiple redirections
@@ -40,8 +40,14 @@ apiClient.interceptors.response.use(
       // 1. Not already redirecting
       // 2. Not on an auth page
       // 3. Not calling an auth endpoint (like /api/auth/me)
-      const authPages = ['/login', '/forgot-password', '/reset-password', '/registration-access', '/registration-public'];
-      const isAuthPage = authPages.some(page => window.location.pathname.includes(page));
+      const authPages = [
+        '/login',
+        '/forgot-password',
+        '/reset-password',
+        '/registration-access',
+        '/registration-public',
+      ];
+      const isAuthPage = authPages.some((page) => window.location.pathname.includes(page));
 
       if (!isRedirecting && !isAuthPage && !isAuthEndpoint) {
         isRedirecting = true;
@@ -57,7 +63,7 @@ apiClient.interceptors.response.use(
       }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default apiClient;

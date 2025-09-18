@@ -19,20 +19,7 @@ import {
   Dashboard as DashboardIcon,
 } from '@mui/icons-material';
 import PageLayout from '@/components/layout/PageLayout';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-} from 'recharts';
+import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import api from '@/api/axios';
 
 interface StatCardProps {
@@ -87,7 +74,9 @@ const Dashboard: React.FC = () => {
     totalFormTemplates: 0,
   });
 
-  const [registrationsByStatus, setRegistrationsByStatus] = useState<any[]>([]);
+  const [registrationsByStatus, setRegistrationsByStatus] = useState<
+    { name: string; value: number; color: string }[]
+  >([]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -119,11 +108,18 @@ const Dashboard: React.FC = () => {
         { name: 'Validées', value: registrationStats.validated || 0, color: '#4caf50' },
         { name: 'En attente', value: registrationStats.pending || 0, color: '#ff9800' },
         { name: 'Rejetées', value: registrationStats.rejected || 0, color: '#f44336' },
-        { name: 'Brouillons', value: registrationStats.byStatus?.find((s: any) => s.status === 'Draft')?.count || 0, color: '#9e9e9e' },
-      ].filter(item => item.value > 0);
+        {
+          name: 'Brouillons',
+          value:
+            registrationStats.byStatus?.find(
+              (s: { status: string; count: number }) => s.status === 'Draft',
+            )?.count || 0,
+          color: '#9e9e9e',
+        },
+      ].filter((item) => item.value > 0);
 
       setRegistrationsByStatus(statusData);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setError('Erreur lors du chargement des données du tableau de bord');
     } finally {
@@ -140,13 +136,14 @@ const Dashboard: React.FC = () => {
   };
 
   // Calculate success rate
-  const successRate = stats.totalRegistrations > 0 
-    ? Math.round((stats.validatedRegistrations / stats.totalRegistrations) * 100)
-    : 0;
+  const successRate =
+    stats.totalRegistrations > 0
+      ? Math.round((stats.validatedRegistrations / stats.totalRegistrations) * 100)
+      : 0;
 
   return (
-    <PageLayout 
-      title="Tableau de bord" 
+    <PageLayout
+      title="Tableau de bord"
       description="Vue d'ensemble des activités et statistiques de la plateforme"
       icon={<DashboardIcon />}
       actions={
@@ -160,11 +157,18 @@ const Dashboard: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : error ? (
-        <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
       ) : (
         <>
           {/* Statistics Cards */}
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={4} sx={{ flexWrap: 'wrap' }}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            mb={4}
+            sx={{ flexWrap: 'wrap' }}
+          >
             <StatCard
               title="Total des utilisateurs"
               value={stats.totalUsers}

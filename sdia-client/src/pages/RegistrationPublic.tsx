@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -14,12 +14,10 @@ import {
   Card,
   CardContent,
   Divider,
-  Stack,
   Snackbar,
   List,
   ListItem,
   ListItemText,
-  ListItemIcon,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -92,8 +90,32 @@ const RegistrationPublic: React.FC = () => {
     formData: '',
   });
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  // const [success, setSuccess] = useState('');
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error',
+  });
+
+  const fetchRegistration = useCallback(async () => {
+    try {
+      const sessionToken = sessionStorage.getItem('registration_session_token');
+      const response = await axios.get(`/api/registrations-public/${token}`, {
+        headers: {
+          Authorization: `Bearer ${sessionToken}`,
+        },
+      });
+      setRegistration(response.data);
+      setLoading(false);
+    } catch (err: unknown) {
+      const errorMessage =
+        err && typeof err === 'object' && 'response' in err
+          ? (err.response as { data?: { error?: string } })?.data?.error
+          : undefined;
+      setError(errorMessage || "Impossible de charger l'inscription");
+      setLoading(false);
+    }
+  }, [token]);
 
   useEffect(() => {
     const sessionToken = sessionStorage.getItem('registration_session_token');
@@ -105,36 +127,7 @@ const RegistrationPublic: React.FC = () => {
     }
 
     fetchRegistration();
-  }, [token, navigate]);
-
-  const fetchRegistration = async () => {
-    try {
-      const sessionToken = sessionStorage.getItem('registration_session_token');
-      const response = await axios.get(`/api/registrations-public/${token}`, {
-        headers: {
-          'X-Session-Token': sessionToken,
-        },
-      });
-
-      setRegistration(response.data);
-      setFormData({
-        firstName: response.data.firstName,
-        lastName: response.data.lastName,
-        email: response.data.email,
-        phone: response.data.phone || '',
-        birthDate: response.data.birthDate.split('T')[0],
-        formData: response.data.formData || '',
-      });
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        navigate(`/registration-access/${token}`);
-      } else {
-        setError('Erreur lors du chargement du dossier');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [token, navigate, fetchRegistration]);
 
   const handleSave = async (submit: boolean = false) => {
     setSaving(true);
@@ -152,7 +145,7 @@ const RegistrationPublic: React.FC = () => {
           headers: {
             'X-Session-Token': sessionToken,
           },
-        }
+        },
       );
 
       if (response.data.success) {
@@ -167,13 +160,21 @@ const RegistrationPublic: React.FC = () => {
           await fetchRegistration();
         }
       }
-    } catch (err: any) {
-      if (err.response?.status === 401) {
+    } catch (err: unknown) {
+      const errorMessage =
+        err && typeof err === 'object' && 'response' in err
+          ? (err.response as { data?: { error?: string }; status?: number })?.data?.error
+          : undefined;
+      const status =
+        err && typeof err === 'object' && 'response' in err
+          ? (err.response as { status?: number })?.status
+          : undefined;
+      if (status === 401) {
         navigate(`/registration-access/${token}`);
       } else {
         setSnackbar({
           open: true,
-          message: err.response?.data?.error || 'Erreur lors de la sauvegarde',
+          message: errorMessage || 'Erreur lors de la sauvegarde',
           severity: 'error',
         });
       }
@@ -184,38 +185,60 @@ const RegistrationPublic: React.FC = () => {
 
   const getStatusIcon = (status: number) => {
     switch (status) {
-      case 0: return <DraftIcon />;
-      case 1: return <PendingIcon />;
-      case 2: return <CheckCircleIcon color="success" />;
-      case 3: return <CancelIcon color="error" />;
-      default: return <DraftIcon />;
+      case 0:
+        return <DraftIcon />;
+      case 1:
+        return <PendingIcon />;
+      case 2:
+        return <CheckCircleIcon color="success" />;
+      case 3:
+        return <CancelIcon color="error" />;
+      default:
+        return <DraftIcon />;
     }
   };
 
   const getStatusLabel = (status: number) => {
     switch (status) {
-      case 0: return 'Brouillon';
-      case 1: return 'En attente';
-      case 2: return 'Validé';
-      case 3: return 'Rejeté';
-      default: return 'Inconnu';
+      case 0:
+        return 'Brouillon';
+      case 1:
+        return 'En attente';
+      case 2:
+        return 'Validé';
+      case 3:
+        return 'Rejeté';
+      default:
+        return 'Inconnu';
     }
   };
 
   const getStatusColor = (status: number) => {
     switch (status) {
-      case 0: return 'default';
-      case 1: return 'warning';
-      case 2: return 'success';
-      case 3: return 'error';
-      default: return 'default';
+      case 0:
+        return 'default';
+      case 1:
+        return 'warning';
+      case 2:
+        return 'success';
+      case 3:
+        return 'error';
+      default:
+        return 'default';
     }
   };
 
   if (loading) {
     return (
       <Container maxWidth="lg">
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '60vh',
+          }}
+        >
           <CircularProgress />
         </Box>
       </Container>
@@ -247,13 +270,26 @@ const RegistrationPublic: React.FC = () => {
               <Chip
                 icon={getStatusIcon(registration.status)}
                 label={getStatusLabel(registration.status)}
-                color={getStatusColor(registration.status) as any}
+                color={
+                  getStatusColor(registration.status) as
+                    | 'default'
+                    | 'primary'
+                    | 'secondary'
+                    | 'error'
+                    | 'info'
+                    | 'success'
+                    | 'warning'
+                }
                 size="large"
               />
             </Grid>
           </Grid>
 
-          {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
 
           {registration.rejectionReason && (
             <Alert severity="error" sx={{ mb: 3 }}>
@@ -405,14 +441,18 @@ const RegistrationPublic: React.FC = () => {
                     <ListItem>
                       <ListItemText
                         primary="Date de création"
-                        secondary={format(new Date(registration.createdAt), 'dd MMMM yyyy', { locale: fr })}
+                        secondary={format(new Date(registration.createdAt), 'dd MMMM yyyy', {
+                          locale: fr,
+                        })}
                       />
                     </ListItem>
                     {registration.submittedAt && (
                       <ListItem>
                         <ListItemText
                           primary="Date de soumission"
-                          secondary={format(new Date(registration.submittedAt), 'dd MMMM yyyy', { locale: fr })}
+                          secondary={format(new Date(registration.submittedAt), 'dd MMMM yyyy', {
+                            locale: fr,
+                          })}
                         />
                       </ListItem>
                     )}
@@ -420,7 +460,9 @@ const RegistrationPublic: React.FC = () => {
                       <ListItem>
                         <ListItemText
                           primary="Date de validation"
-                          secondary={format(new Date(registration.validatedAt), 'dd MMMM yyyy', { locale: fr })}
+                          secondary={format(new Date(registration.validatedAt), 'dd MMMM yyyy', {
+                            locale: fr,
+                          })}
                         />
                       </ListItem>
                     )}
@@ -428,7 +470,9 @@ const RegistrationPublic: React.FC = () => {
                       <ListItem>
                         <ListItemText
                           primary="Date de rejet"
-                          secondary={format(new Date(registration.rejectedAt), 'dd MMMM yyyy', { locale: fr })}
+                          secondary={format(new Date(registration.rejectedAt), 'dd MMMM yyyy', {
+                            locale: fr,
+                          })}
                         />
                       </ListItem>
                     )}

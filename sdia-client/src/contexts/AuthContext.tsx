@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { User, AuthContextType, LoginRequest, LoginResponse } from '@/types/auth';
+import { User, AuthContextType, LoginRequest } from '@/types/auth';
 import apiClient from '@/api/client';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,7 +26,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.removeItem('user');
           setUser(null);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         // If 401 or any error, user is not authenticated
         console.log('Session check failed:', err.response?.status);
         localStorage.removeItem('user');
@@ -44,14 +44,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const loginData: LoginRequest = { email, password };
       const response = await apiClient.post('/api/auth/login', loginData);
-      
+
       // The backend returns the user data directly, not a token
       const userData = response.data;
-      
+
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
     } catch (error) {
-      throw error;
+      // Re-throw error for handling by calling component
+      if (error instanceof Error) {
+        throw new Error(error.message);
+      }
+      throw new Error('Login failed');
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +64,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       await apiClient.post('/api/auth/logout');
-    } catch (error) {
+    } catch {
+      // Ignore logout errors
     } finally {
       localStorage.removeItem('user');
       setUser(null);
@@ -78,6 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -85,3 +91,6 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+// Default export for React Fast Refresh compatibility
+export default AuthProvider;

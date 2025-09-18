@@ -19,7 +19,6 @@ import {
   Alert,
   Snackbar,
   CircularProgress,
-  IconButton,
   Tooltip,
   Avatar,
   Stack,
@@ -36,13 +35,13 @@ import {
 } from '@mui/icons-material';
 import { DataGrid, type GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { useForm, Controller } from 'react-hook-form';
-import { 
-  useUsers, 
-  useCreateUser, 
-  useUpdateUser, 
-  useDeleteUser, 
-  useResendValidationEmail, 
-  useResetUserPassword 
+import {
+  useUsers,
+  useCreateUser,
+  useUpdateUser,
+  useDeleteUser,
+  useResendValidationEmail,
+  useResetUserPassword,
 } from '@/hooks/useUsers';
 import { CreateUser, UpdateUser, UserList } from '@/types/user';
 
@@ -53,7 +52,11 @@ const Users: React.FC = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserList | null>(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error',
+  });
 
   // Queries and mutations
   const { data: usersData, isLoading, refetch } = useUsers(page + 1, pageSize);
@@ -71,7 +74,7 @@ const Users: React.FC = () => {
       lastName: '',
       phone: '',
       role: 'User',
-    }
+    },
   });
 
   const editForm = useForm<UpdateUser>({
@@ -82,7 +85,7 @@ const Users: React.FC = () => {
       phone: '',
       role: 'User',
       isActive: true,
-    }
+    },
   });
 
   const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
@@ -96,14 +99,19 @@ const Users: React.FC = () => {
       createForm.reset();
       showSnackbar('Utilisateur créé avec succès. Un email de validation a été envoyé.');
       refetch();
-    } catch (error: any) {
-      showSnackbar(error?.response?.data?.message || 'Erreur lors de la création', 'error');
+    } catch (error: unknown) {
+      const errorMessage =
+        error && typeof error === 'object' && 'response' in error
+          ? (error.response as { data?: { message?: string } })?.data?.message ||
+            'Une erreur est survenue'
+          : 'Une erreur est survenue';
+      showSnackbar(errorMessage, 'error');
     }
   };
 
   const handleUpdateUser = async (data: UpdateUser) => {
     if (!selectedUser) return;
-    
+
     try {
       await updateUserMutation.mutateAsync({ id: selectedUser.id, user: data });
       setEditDialogOpen(false);
@@ -111,8 +119,13 @@ const Users: React.FC = () => {
       editForm.reset();
       showSnackbar('Utilisateur modifié avec succès');
       refetch();
-    } catch (error: any) {
-      showSnackbar(error?.response?.data?.message || 'Erreur lors de la modification', 'error');
+    } catch (error: unknown) {
+      const errorMessage =
+        error && typeof error === 'object' && 'response' in error
+          ? (error.response as { data?: { message?: string } })?.data?.message ||
+            'Une erreur est survenue'
+          : 'Une erreur est survenue';
+      showSnackbar(errorMessage, 'error');
     }
   };
 
@@ -125,8 +138,13 @@ const Users: React.FC = () => {
       setSelectedUser(null);
       showSnackbar('Utilisateur supprimé avec succès');
       refetch();
-    } catch (error: any) {
-      showSnackbar(error?.response?.data?.message || 'Erreur lors de la suppression', 'error');
+    } catch (error: unknown) {
+      const errorMessage =
+        error && typeof error === 'object' && 'response' in error
+          ? (error.response as { data?: { message?: string } })?.data?.message ||
+            'Une erreur est survenue'
+          : 'Une erreur est survenue';
+      showSnackbar(errorMessage, 'error');
     }
   };
 
@@ -134,8 +152,13 @@ const Users: React.FC = () => {
     try {
       await resendEmailMutation.mutateAsync(userId);
       showSnackbar('Email de validation renvoyé avec succès');
-    } catch (error: any) {
-      showSnackbar(error?.response?.data?.message || 'Erreur lors de l\'envoi de l\'email', 'error');
+    } catch (error: unknown) {
+      const errorMessage =
+        error && typeof error === 'object' && 'response' in error
+          ? (error.response as { data?: { message?: string } })?.data?.message ||
+            'Une erreur est survenue'
+          : 'Une erreur est survenue';
+      showSnackbar(errorMessage, 'error');
     }
   };
 
@@ -143,8 +166,13 @@ const Users: React.FC = () => {
     try {
       await resetPasswordMutation.mutateAsync(userId);
       showSnackbar('Mot de passe réinitialisé avec succès');
-    } catch (error: any) {
-      showSnackbar(error?.response?.data?.message || 'Erreur lors de la réinitialisation', 'error');
+    } catch (error: unknown) {
+      const errorMessage =
+        error && typeof error === 'object' && 'response' in error
+          ? (error.response as { data?: { message?: string } })?.data?.message ||
+            'Une erreur est survenue'
+          : 'Une erreur est survenue';
+      showSnackbar(errorMessage, 'error');
     }
   };
 
@@ -187,18 +215,23 @@ const Users: React.FC = () => {
       minWidth: 350,
       renderCell: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1 }}>
-          <Avatar 
-            sx={{ 
-              bgcolor: params.row.role === 'Admin' ? 'error.main' : 
-                      params.row.role === 'Manager' ? 'warning.main' : 'primary.main',
+          <Avatar
+            sx={{
+              bgcolor:
+                params.row.role === 'Admin'
+                  ? 'error.main'
+                  : params.row.role === 'Manager'
+                    ? 'warning.main'
+                    : 'primary.main',
               width: 45,
               height: 45,
               fontSize: '1rem',
               fontWeight: 600,
-              boxShadow: 1
+              boxShadow: 1,
             }}
           >
-            {params.row.firstName?.[0]}{params.row.lastName?.[0]}
+            {params.row.firstName?.[0]}
+            {params.row.lastName?.[0]}
           </Avatar>
           <Box>
             <Typography variant="body1" fontWeight="600" sx={{ mb: 0.25 }}>
@@ -258,9 +291,14 @@ const Users: React.FC = () => {
           <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
             <strong>Créé:</strong> {new Date(params.row.createdAt).toLocaleDateString('fr-FR')}
           </Typography>
-          <Typography variant="caption" sx={{ color: params.row.lastLoginAt ? 'success.main' : 'text.disabled' }}>
-            <strong>Connexion:</strong> {params.row.lastLoginAt ? 
-              new Date(params.row.lastLoginAt).toLocaleDateString('fr-FR') : 'Jamais'}
+          <Typography
+            variant="caption"
+            sx={{ color: params.row.lastLoginAt ? 'success.main' : 'text.disabled' }}
+          >
+            <strong>Connexion:</strong>{' '}
+            {params.row.lastLoginAt
+              ? new Date(params.row.lastLoginAt).toLocaleDateString('fr-FR')
+              : 'Jamais'}
           </Typography>
         </Box>
       ),
@@ -315,8 +353,8 @@ const Users: React.FC = () => {
   ];
 
   return (
-    <PageLayout 
-      title="Gestion des Utilisateurs" 
+    <PageLayout
+      title="Gestion des Utilisateurs"
       description="Gérez les comptes utilisateurs de la plateforme"
       icon={<PersonIcon />}
       actions={
@@ -329,18 +367,19 @@ const Users: React.FC = () => {
         </Button>
       }
     >
-      <Paper sx={{ 
-        p: 3, 
-        boxShadow: 3, 
-        borderRadius: 2, 
-        width: '100%',
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        minHeight: 0
-      }}>
-
+      <Paper
+        sx={{
+          p: 3,
+          boxShadow: 3,
+          borderRadius: 2,
+          width: '100%',
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          minHeight: 0,
+        }}
+      >
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
           <DataGrid
             rows={usersData?.items || []}
@@ -356,25 +395,25 @@ const Users: React.FC = () => {
             pageSizeOptions={[5, 10, 25, 50]}
             disableRowSelectionOnClick
             getRowHeight={() => 'auto'}
-            sx={{ 
-              ...dataGridTheme, 
-              width: '100%', 
+            sx={{
+              ...dataGridTheme,
+              width: '100%',
               flex: 1,
               minHeight: 0,
               '& .MuiDataGrid-main': {
-                overflow: 'hidden'
+                overflow: 'hidden',
               },
               '& .MuiDataGrid-virtualScroller': {
-                overflow: 'auto'
-              }
+                overflow: 'auto',
+              },
             }}
           />
         </Box>
       </Paper>
 
       {/* Create User Dialog */}
-      <Dialog 
-        open={createDialogOpen} 
+      <Dialog
+        open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
         maxWidth="sm"
         fullWidth
@@ -386,12 +425,12 @@ const Users: React.FC = () => {
               <Controller
                 name="email"
                 control={createForm.control}
-                rules={{ 
+                rules={{
                   required: 'Email requis',
                   pattern: {
                     value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                    message: 'Email invalide'
-                  }
+                    message: 'Email invalide',
+                  },
                 }}
                 render={({ field, fieldState }) => (
                   <TextField
@@ -404,7 +443,7 @@ const Users: React.FC = () => {
                   />
                 )}
               />
-              
+
               <Controller
                 name="firstName"
                 control={createForm.control}
@@ -419,7 +458,7 @@ const Users: React.FC = () => {
                   />
                 )}
               />
-              
+
               <Controller
                 name="lastName"
                 control={createForm.control}
@@ -434,20 +473,15 @@ const Users: React.FC = () => {
                   />
                 )}
               />
-              
+
               <Controller
                 name="phone"
                 control={createForm.control}
                 render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Téléphone"
-                    type="tel"
-                    fullWidth
-                  />
+                  <TextField {...field} label="Téléphone" type="tel" fullWidth />
                 )}
               />
-              
+
               <Controller
                 name="role"
                 control={createForm.control}
@@ -472,11 +506,7 @@ const Users: React.FC = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setCreateDialogOpen(false)}>Annuler</Button>
-            <Button 
-              type="submit" 
-              variant="contained"
-              disabled={createUserMutation.isPending}
-            >
+            <Button type="submit" variant="contained" disabled={createUserMutation.isPending}>
               {createUserMutation.isPending ? <CircularProgress size={20} /> : 'Créer'}
             </Button>
           </DialogActions>
@@ -484,8 +514,8 @@ const Users: React.FC = () => {
       </Dialog>
 
       {/* Edit User Dialog */}
-      <Dialog 
-        open={editDialogOpen} 
+      <Dialog
+        open={editDialogOpen}
         onClose={() => setEditDialogOpen(false)}
         maxWidth="sm"
         fullWidth
@@ -497,12 +527,12 @@ const Users: React.FC = () => {
               <Controller
                 name="email"
                 control={editForm.control}
-                rules={{ 
+                rules={{
                   required: 'Email requis',
                   pattern: {
                     value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                    message: 'Email invalide'
-                  }
+                    message: 'Email invalide',
+                  },
                 }}
                 render={({ field, fieldState }) => (
                   <TextField
@@ -515,7 +545,7 @@ const Users: React.FC = () => {
                   />
                 )}
               />
-              
+
               <Controller
                 name="firstName"
                 control={editForm.control}
@@ -530,7 +560,7 @@ const Users: React.FC = () => {
                   />
                 )}
               />
-              
+
               <Controller
                 name="lastName"
                 control={editForm.control}
@@ -545,20 +575,15 @@ const Users: React.FC = () => {
                   />
                 )}
               />
-              
+
               <Controller
                 name="phone"
                 control={editForm.control}
                 render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Téléphone"
-                    type="tel"
-                    fullWidth
-                  />
+                  <TextField {...field} label="Téléphone" type="tel" fullWidth />
                 )}
               />
-              
+
               <Controller
                 name="role"
                 control={editForm.control}
@@ -579,18 +604,13 @@ const Users: React.FC = () => {
                   </FormControl>
                 )}
               />
-              
+
               <Controller
                 name="isActive"
                 control={editForm.control}
                 render={({ field }) => (
                   <FormControlLabel
-                    control={
-                      <Switch
-                        checked={field.value}
-                        onChange={field.onChange}
-                      />
-                    }
+                    control={<Switch checked={field.value} onChange={field.onChange} />}
                     label="Compte actif"
                   />
                 )}
@@ -599,11 +619,7 @@ const Users: React.FC = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setEditDialogOpen(false)}>Annuler</Button>
-            <Button 
-              type="submit" 
-              variant="contained"
-              disabled={updateUserMutation.isPending}
-            >
+            <Button type="submit" variant="contained" disabled={updateUserMutation.isPending}>
               {updateUserMutation.isPending ? <CircularProgress size={20} /> : 'Sauvegarder'}
             </Button>
           </DialogActions>
@@ -611,18 +627,15 @@ const Users: React.FC = () => {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        maxWidth="sm"
-      >
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="sm">
         <DialogTitle>Confirmer la Suppression</DialogTitle>
         <DialogContent>
           <Typography>
             Êtes-vous sûr de vouloir supprimer l'utilisateur{' '}
             <strong>
               {selectedUser?.firstName} {selectedUser?.lastName}
-            </strong> ?
+            </strong>{' '}
+            ?
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
             Cette action est irréversible.

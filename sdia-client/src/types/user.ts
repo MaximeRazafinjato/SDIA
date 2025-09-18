@@ -60,5 +60,5 @@ export interface UserStats {
   byRole: { role: string; count: number }[];
 }
 
-export interface UserFormData extends CreateUser {}
-export interface UpdateUserFormData extends UpdateUser {}
+export type UserFormData = CreateUser;
+export type UpdateUserFormData = UpdateUser;

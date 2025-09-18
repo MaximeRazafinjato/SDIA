@@ -24,19 +24,21 @@ import {
 import apiClient from '@/api/client';
 
 // Validation schema
-const resetPasswordSchema = z.object({
-  newPassword: z
-    .string()
-    .min(8, 'Le mot de passe doit contenir au moins 8 caractères')
-    .regex(/[A-Z]/, 'Le mot de passe doit contenir au moins une majuscule')
-    .regex(/[a-z]/, 'Le mot de passe doit contenir au moins une minuscule')
-    .regex(/[0-9]/, 'Le mot de passe doit contenir au moins un chiffre')
-    .regex(/[^a-zA-Z0-9]/, 'Le mot de passe doit contenir au moins un caractère spécial'),
-  confirmPassword: z.string(),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Les mots de passe ne correspondent pas",
-  path: ["confirmPassword"],
-});
+const resetPasswordSchema = z
+  .object({
+    newPassword: z
+      .string()
+      .min(8, 'Le mot de passe doit contenir au moins 8 caractères')
+      .regex(/[A-Z]/, 'Le mot de passe doit contenir au moins une majuscule')
+      .regex(/[a-z]/, 'Le mot de passe doit contenir au moins une minuscule')
+      .regex(/[0-9]/, 'Le mot de passe doit contenir au moins un chiffre')
+      .regex(/[^a-zA-Z0-9]/, 'Le mot de passe doit contenir au moins un caractère spécial'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Les mots de passe ne correspondent pas',
+    path: ['confirmPassword'],
+  });
 
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
@@ -48,7 +50,7 @@ const ResetPassword: React.FC = () => {
   const [validatingToken, setValidatingToken] = useState(true);
   const [tokenValid, setTokenValid] = useState(false);
   const [userEmail, setUserEmail] = useState('');
-  
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
@@ -81,7 +83,8 @@ const ResetPassword: React.FC = () => {
         } else {
           setError('Le lien de réinitialisation est invalide ou a expiré.');
         }
-      } catch (err) {
+      } catch {
+        // unused error parameter
         setError('Erreur lors de la validation du lien.');
       } finally {
         setValidatingToken(false);
@@ -94,22 +97,23 @@ const ResetPassword: React.FC = () => {
   const onSubmit = async (data: ResetPasswordFormData) => {
     try {
       setError('');
-      
+
       await apiClient.post('/api/auth/reset-password', {
         token,
         newPassword: data.newPassword,
         confirmPassword: data.confirmPassword,
       });
-      
+
       setSuccess(true);
       setTimeout(() => {
         navigate('/login');
       }, 3000);
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message || 
-        'Une erreur est survenue lors de la réinitialisation.'
-      );
+    } catch (err: unknown) {
+      const errorMessage =
+        err && typeof err === 'object' && 'response' in err
+          ? (err.response as { data?: { message?: string } })?.data?.message
+          : undefined;
+      setError(errorMessage || 'Une erreur est survenue lors de la réinitialisation.');
     }
   };
 
@@ -178,10 +182,10 @@ const ResetPassword: React.FC = () => {
               >
                 Mot de passe réinitialisé !
               </Typography>
-              
+
               <Alert severity="success" sx={{ width: '100%', mb: 3 }}>
-                Votre mot de passe a été réinitialisé avec succès. 
-                Vous allez être redirigé vers la page de connexion...
+                Votre mot de passe a été réinitialisé avec succès. Vous allez être redirigé vers la
+                page de connexion...
               </Alert>
 
               <CircularProgress size={30} />
@@ -233,7 +237,7 @@ const ResetPassword: React.FC = () => {
               >
                 Lien invalide
               </Typography>
-              
+
               <Alert severity="error" sx={{ width: '100%', mb: 3 }}>
                 {error || 'Le lien de réinitialisation est invalide ou a expiré.'}
               </Alert>
@@ -307,7 +311,7 @@ const ResetPassword: React.FC = () => {
             >
               Nouveau mot de passe
             </Typography>
-            
+
             {userEmail && (
               <Typography
                 variant="body1"
@@ -327,11 +331,7 @@ const ResetPassword: React.FC = () => {
               </Alert>
             )}
 
-            <Box
-              component="form"
-              onSubmit={handleSubmit(onSubmit)}
-              sx={{ width: '100%' }}
-            >
+            <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ width: '100%' }}>
               <Controller
                 name="newPassword"
                 control={control}
@@ -355,10 +355,7 @@ const ResetPassword: React.FC = () => {
                       ),
                       endAdornment: (
                         <InputAdornment position="end">
-                          <IconButton
-                            onClick={() => setShowPassword(!showPassword)}
-                            edge="end"
-                          >
+                          <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
                             {showPassword ? <VisibilityOff /> : <Visibility />}
                           </IconButton>
                         </InputAdornment>

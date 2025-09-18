@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -13,11 +13,7 @@ import {
   Step,
   StepLabel,
 } from '@mui/material';
-import {
-  LockOutlined,
-  CheckCircleOutline,
-  SmsOutlined,
-} from '@mui/icons-material';
+import { LockOutlined, CheckCircleOutline, SmsOutlined } from '@mui/icons-material';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5206';
@@ -35,19 +31,12 @@ const RegistrationAccess: React.FC = () => {
   const [phoneNumber, setPhoneNumber] = useState<string>('');
   const [verificationCode, setVerificationCode] = useState('');
   const [attemptsRemaining, setAttemptsRemaining] = useState(5);
-  const [sessionData, setSessionData] = useState<any>(null);
+  // const [sessionData, setSessionData] = useState<unknown>(null);
 
   const steps = ['Vérification du lien', 'Code de vérification', 'Accès au dossier'];
 
   // Step 1: Request verification code when component mounts
-  useEffect(() => {
-    if (token && !hasRequestedCode.current) {
-      hasRequestedCode.current = true;
-      requestVerificationCode();
-    }
-  }, [token]);
-
-  const requestVerificationCode = async () => {
+  const requestVerificationCode = useCallback(async () => {
     setLoading(true);
     setError('');
 
@@ -59,7 +48,7 @@ const RegistrationAccess: React.FC = () => {
           headers: {
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       console.log('Response:', response.data);
@@ -69,24 +58,42 @@ const RegistrationAccess: React.FC = () => {
         setSuccess(response.data.message);
         setActiveStep(1);
       } else {
-        setError('Une erreur est survenue lors de l\'envoi du code');
+        setError("Une erreur est survenue lors de l'envoi du code");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorResponse =
+        err && typeof err === 'object' && 'response' in err
+          ? (err.response as {
+              data?: { error?: string; requiresPhoneUpdate?: boolean };
+              message?: string;
+            })
+          : null;
+      const errorMessage =
+        err && typeof err === 'object' && 'message' in err
+          ? (err as { message: string }).message
+          : null;
       console.error('Error:', err);
 
-      if (err.response?.data?.error) {
-        setError(err.response.data.error);
-      } else if (err.response?.data?.requiresPhoneUpdate) {
-        setError('Aucun numéro de téléphone associé. Veuillez contacter l\'administration.');
-      } else if (err.message) {
-        setError(err.message);
+      if (errorResponse?.data?.error) {
+        setError(errorResponse.data.error);
+      } else if (errorResponse?.data?.requiresPhoneUpdate) {
+        setError("Aucun numéro de téléphone associé. Veuillez contacter l'administration.");
+      } else if (errorMessage) {
+        setError(errorMessage);
       } else {
         setError('Impossible de vérifier le lien. Veuillez vérifier votre connexion.');
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (token && !hasRequestedCode.current) {
+      hasRequestedCode.current = true;
+      requestVerificationCode();
+    }
+  }, [token, requestVerificationCode]);
 
   const verifyCode = async () => {
     if (!verificationCode || verificationCode.length !== 6) {
@@ -100,12 +107,12 @@ const RegistrationAccess: React.FC = () => {
     try {
       const response = await axios.post(
         `${API_BASE_URL}/api/public/registration-access/${token}/verify-code`,
-        { code: verificationCode }
+        { code: verificationCode },
       );
 
       if (response.data.success) {
         setSuccess('Vérification réussie ! Redirection...');
-        setSessionData(response.data);
+        // setSessionData(response.data);
         setActiveStep(2);
 
         // Redirect to edit page after 2 seconds
@@ -113,13 +120,20 @@ const RegistrationAccess: React.FC = () => {
           navigate(`/registration-edit/${response.data.registrationId}`, {
             state: {
               sessionToken: response.data.sessionToken,
-              verified: true
-            }
+              verified: true,
+            },
           });
         }, 2000);
       }
-    } catch (err: any) {
-      const errorData = err.response?.data;
+    } catch (err: unknown) {
+      const errorData =
+        err && typeof err === 'object' && 'response' in err
+          ? (
+              err.response as {
+                data?: { error?: string; attemptsRemaining?: number; maxAttemptsReached?: boolean };
+              }
+            )?.data
+          : undefined;
       setError(errorData?.error || 'Code incorrect');
 
       if (errorData?.attemptsRemaining !== undefined) {
@@ -231,9 +245,7 @@ const RegistrationAccess: React.FC = () => {
               <Box sx={{ width: '100%', mt: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                   <SmsOutlined sx={{ mr: 1, color: 'primary.main' }} />
-                  <Typography variant="body1">
-                    Un code a été envoyé au {phoneNumber}
-                  </Typography>
+                  <Typography variant="body1">Un code a été envoyé au {phoneNumber}</Typography>
                 </Box>
 
                 <TextField
@@ -247,7 +259,7 @@ const RegistrationAccess: React.FC = () => {
                     style: {
                       fontSize: '1.5rem',
                       letterSpacing: '0.5rem',
-                      textAlign: 'center'
+                      textAlign: 'center',
                     },
                     maxLength: 6,
                   }}
@@ -284,9 +296,7 @@ const RegistrationAccess: React.FC = () => {
 
             {!loading && activeStep === 2 && (
               <Box sx={{ textAlign: 'center', mt: 2 }}>
-                <CheckCircleOutline
-                  sx={{ fontSize: 64, color: 'success.main', mb: 2 }}
-                />
+                <CheckCircleOutline sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
                 <Typography variant="h6" gutterBottom>
                   Vérification réussie !
                 </Typography>

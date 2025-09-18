@@ -24,10 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 // Validation schema using Zod
 const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'L\'email est requis')
-    .email('Format d\'email invalide'),
+  email: z.string().min(1, "L'email est requis").email("Format d'email invalide"),
   password: z
     .string()
     .min(1, 'Le mot de passe est requis')
@@ -43,7 +40,7 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = (location.state as any)?.from?.pathname || '/dashboard';
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
 
   const {
     control,
@@ -73,11 +70,12 @@ const Login: React.FC = () => {
       // Use dashboard as default if no specific page was requested
       const targetPath = from === '/login' ? '/dashboard' : from;
       navigate(targetPath, { replace: true });
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message ||
-        'Échec de la connexion. Vérifiez vos identifiants.'
-      );
+    } catch (err: unknown) {
+      const errorMessage =
+        err && typeof err === 'object' && 'response' in err
+          ? (err.response as { data?: { message?: string } })?.data?.message
+          : undefined;
+      setError(errorMessage || 'Échec de la connexion. Vérifiez vos identifiants.');
     }
   };
 
@@ -87,12 +85,7 @@ const Login: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
         <Typography>Chargement...</Typography>
       </Box>
     );
@@ -155,11 +148,7 @@ const Login: React.FC = () => {
               </Alert>
             )}
 
-            <Box
-              component="form"
-              onSubmit={handleSubmit(onSubmit)}
-              sx={{ width: '100%' }}
-            >
+            <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ width: '100%' }}>
               <Controller
                 name="email"
                 control={control}

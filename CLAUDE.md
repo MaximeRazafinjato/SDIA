@@ -21,7 +21,7 @@ dotnet run --project SDIA.API
 
 # Frontend (React)
 cd sdia-client
-npm run dev
+pnpm run dev
 ```
 
 ### Build and Test
@@ -34,9 +34,21 @@ dotnet test
 
 # Frontend
 cd sdia-client
-npm run build
-npm run lint
+pnpm run build
+pnpm run lint
+pnpm run format
 ```
+
+### Important Instructions for Claude
+
+-   **ALWAYS USE pnpm** instead of npm or yarn for all frontend operations
+-   **ALWAYS** run `pnpm run lint` AND `pnpm run format` in the sdia-client directory after making any changes to TypeScript/React files
+-   If linting errors are found, fix them immediately before proceeding
+-   The commands to run after any frontend modification:
+    ```bash
+    cd sdia-client && pnpm run lint && pnpm run format
+    ```
+-   **ALWAYS** run puppeteer-navigate with the argument "args: ["--start-maximized"]" and with the resolution 1920x1080
 
 ## Architecture
 

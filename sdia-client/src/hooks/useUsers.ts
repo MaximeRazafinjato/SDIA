@@ -1,13 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
-import { 
-  User, 
-  UserList, 
-  UsersResponse, 
-  CreateUser, 
-  UpdateUser, 
-  UserStats 
-} from '@/types/user';
+import { User, UsersResponse, CreateUser, UpdateUser, UserStats } from '@/types/user';
 
 const USERS_QUERY_KEY = 'users';
 
@@ -17,7 +10,7 @@ export const useUsers = (page: number = 1, pageSize: number = 20) => {
     queryKey: [USERS_QUERY_KEY, { page, pageSize }],
     queryFn: async (): Promise<UsersResponse> => {
       const response = await apiClient.get('/api/users', {
-        params: { page, pageSize }
+        params: { page, pageSize },
       });
       return response.data;
     },
@@ -52,9 +45,11 @@ export const useUserStats = () => {
 // Create a new user
 export const useCreateUser = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (user: CreateUser): Promise<{ id: string; message: string; email: string }> => {
+    mutationFn: async (
+      user: CreateUser,
+    ): Promise<{ id: string; message: string; email: string }> => {
       const response = await apiClient.post('/api/users', user);
       return response.data;
     },
@@ -67,9 +62,15 @@ export const useCreateUser = () => {
 // Update a user
 export const useUpdateUser = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, user }: { id: string; user: UpdateUser }): Promise<{ message: string }> => {
+    mutationFn: async ({
+      id,
+      user,
+    }: {
+      id: string;
+      user: UpdateUser;
+    }): Promise<{ message: string }> => {
       const response = await apiClient.put(`/api/users/${id}`, user);
       return response.data;
     },
@@ -83,7 +84,7 @@ export const useUpdateUser = () => {
 // Delete a user
 export const useDeleteUser = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string): Promise<{ message: string }> => {
       const response = await apiClient.delete(`/api/users/${id}`);

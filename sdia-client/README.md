@@ -48,11 +48,11 @@ src/
 
 ### Prérequis
 - Node.js (v16 ou supérieur)
-- npm ou yarn
+- pnpm
 
 ### Installation des dépendances
 ```bash
-npm install
+pnpm install
 ```
 
 ### Configuration de l'environnement
@@ -68,16 +68,19 @@ Configuration par défaut:
 
 ```bash
 # Démarrer en mode développement
-npm run dev
+pnpm run dev
 
 # Build pour production
-npm run build
+pnpm run build
 
 # Prévisualiser la build de production
-npm run preview
+pnpm run preview
 
 # Linter ESLint
-npm run lint
+pnpm run lint
+
+# Formater le code avec Prettier
+pnpm run format
 ```
 
 ## 🎨 Fonctionnalités
@@ -146,14 +149,14 @@ L'application est entièrement responsive et s'adapte à tous les écrans:
 
 ### Build de Production
 ```bash
-npm run build
+pnpm run build
 ```
 
 La build génère un dossier `dist/` prêt pour le déploiement.
 
 ### Serveur de Développement
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 L'application sera accessible sur `http://localhost:5173`
