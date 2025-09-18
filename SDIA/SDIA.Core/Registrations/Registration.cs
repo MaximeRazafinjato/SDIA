@@ -32,6 +32,13 @@ public class Registration : BaseEntity
     public string SmsVerificationCode { get; set; } = string.Empty;
     public bool EmailVerified { get; set; } = false;
     public bool PhoneVerified { get; set; } = false;
+
+    // Public Access
+    public string? AccessToken { get; set; }
+    public DateTime? AccessTokenExpiry { get; set; }
+    public DateTime? VerificationCodeExpiry { get; set; }
+    public DateTime? LastReminderSentAt { get; set; }
+    public int VerificationAttempts { get; set; } = 0;
     
     // Relations
     public Guid OrganizationId { get; set; }

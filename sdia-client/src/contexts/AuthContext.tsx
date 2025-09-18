@@ -13,19 +13,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in
+    // Check if user is already logged in by verifying with the server
     const checkAuth = async () => {
-      const savedUser = localStorage.getItem('user');
-      if (savedUser) {
-        try {
-          setUser(JSON.parse(savedUser));
-        } catch (err) {
+      try {
+        // Try to get current user from server to verify cookie is valid
+        const response = await apiClient.get('/api/auth/me');
+        if (response.data) {
+          setUser(response.data);
+          localStorage.setItem('user', JSON.stringify(response.data));
+        } else {
+          // No valid session
           localStorage.removeItem('user');
+          setUser(null);
         }
+      } catch (err: any) {
+        // If 401 or any error, user is not authenticated
+        console.log('Session check failed:', err.response?.status);
+        localStorage.removeItem('user');
+        setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
-    
+
     checkAuth();
   }, []);
 

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SDIA.API.Data;
 
@@ -11,9 +12,11 @@ using SDIA.API.Data;
 namespace SDIA.API.Migrations
 {
     [DbContext(typeof(SDIADbContext))]
-    partial class SDIADbContextModelSnapshot : ModelSnapshot
+    [Migration("20250917100528_AddPublicAccessFields")]
+    partial class AddPublicAccessFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

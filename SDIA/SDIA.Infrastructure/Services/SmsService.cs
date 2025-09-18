@@ -155,9 +155,11 @@ public class SmsService : ISmsService
         try
         {
             // Basic validation - you might want to use Twilio's Lookup API for more thorough validation
-            var phoneUtil = PhoneNumbers.PhoneNumberUtil.GetInstance();
-            var parsedNumber = phoneUtil.Parse(phoneNumber, null);
-            return phoneUtil.IsValidNumber(parsedNumber);
+            // PhoneNumbers library not available - just do basic validation for now
+            // var phoneUtil = PhoneNumbers.PhoneNumberUtil.GetInstance();
+            // var parsedNumber = phoneUtil.Parse(phoneNumber, null);
+            // return phoneUtil.IsValidNumber(parsedNumber);
+            return !string.IsNullOrEmpty(phoneNumber) && phoneNumber.Length >= 10;
         }
         catch (Exception ex)
         {

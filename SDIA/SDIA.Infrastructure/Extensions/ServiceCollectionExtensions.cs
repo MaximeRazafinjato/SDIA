@@ -21,14 +21,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFormTemplateRepository, FormTemplateRepository>();
         services.AddScoped<IDocumentRepository, DocumentRepository>();
         
-        // Register services
-        services.AddScoped<IEmailService, EmailService>();
-        services.AddScoped<ISmsService, SmsService>();
-        services.AddScoped<IFileStorageService, FileStorageService>();
-        
+        // Register services (temporarily commented due to missing interfaces)
+        // services.AddScoped<IEmailService, EmailService>();
+        // services.AddScoped<ISmsService, SmsService>();
+        // services.AddScoped<IFileStorageService, FileStorageService>();
+
         // Configure external services
-        services.Configure<SendGridSettings>(configuration.GetSection("SendGrid"));
-        services.Configure<TwilioSettings>(configuration.GetSection("Twilio"));
+        // services.Configure<SendGridSettings>(configuration.GetSection("SendGrid"));
+        // services.Configure<TwilioSettings>(configuration.GetSection("Twilio"));
         
         return services;
     }

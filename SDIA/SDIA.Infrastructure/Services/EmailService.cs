@@ -158,11 +158,14 @@ public class EmailService : IEmailService
             var personalizations = recipients.Select(recipient =>
             {
                 var personalization = new Personalization();
-                personalization.AddTo(new EmailAddress(recipient.Email, recipient.Name));
+                personalization.Tos = new List<EmailAddress> { new EmailAddress(recipient.Email, recipient.Name) };
                 
                 foreach (var data in recipient.PersonalizationData)
                 {
-                    personalization.AddSubstitution($"-{data.Key}-", data.Value?.ToString() ?? "");
+                    // AddSubstitution method doesn't exist, using Substitutions property
+                    if (personalization.Substitutions == null)
+                        personalization.Substitutions = new Dictionary<string, string>();
+                    personalization.Substitutions.Add($"-{data.Key}-", data.Value?.ToString() ?? "");
                 }
                 
                 return personalization;
@@ -175,7 +178,7 @@ public class EmailService : IEmailService
 
             foreach (var personalization in personalizations)
             {
-                msg.AddPersonalization(personalization);
+                msg.Personalizations.Add(personalization);
             }
 
             if (!string.IsNullOrEmpty(_sendGridSettings.ReplyToEmail))

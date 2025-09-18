@@ -23,16 +23,38 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Flag to prevent multiple redirections
+let isRedirecting = false;
+
 // Response interceptor to handle common errors
 apiClient.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
-    if (error.response?.status === 401 && !window.location.pathname.includes('/login')) {
-      // Session expired or invalid - only redirect if not already on login page
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+    if (error.response?.status === 401) {
+      // Skip redirect logic for auth endpoints
+      const isAuthEndpoint = error.config?.url?.includes('/api/auth/');
+
+      // Only clear and redirect if:
+      // 1. Not already redirecting
+      // 2. Not on an auth page
+      // 3. Not calling an auth endpoint (like /api/auth/me)
+      const authPages = ['/login', '/forgot-password', '/reset-password', '/registration-access', '/registration-public'];
+      const isAuthPage = authPages.some(page => window.location.pathname.includes(page));
+
+      if (!isRedirecting && !isAuthPage && !isAuthEndpoint) {
+        isRedirecting = true;
+        localStorage.removeItem('user');
+
+        // Use replace to avoid history issues
+        window.location.replace('/login');
+
+        // Reset flag after a delay (in case redirect fails)
+        setTimeout(() => {
+          isRedirecting = false;
+        }, 1000);
+      }
     }
     return Promise.reject(error);
   }

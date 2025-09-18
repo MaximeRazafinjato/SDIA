@@ -19,7 +19,6 @@ import {
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
-  School as SchoolIcon,
   Logout as LogoutIcon,
   AccountCircle,
   People as PeopleIcon,
@@ -59,7 +58,6 @@ const MainLayout: React.FC = () => {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Gestion Inscriptions', icon: <AssignmentIcon />, path: '/registrations-dashboard' },
     { text: 'Utilisateurs', icon: <PeopleIcon />, path: '/users' },
-    { text: 'Cours', icon: <SchoolIcon />, path: '/courses' },
   ];
 
   const drawer = (

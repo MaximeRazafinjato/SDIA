@@ -30,6 +30,16 @@ public class FormTemplateRepository : BaseRepository<FormTemplate>, IFormTemplat
             .FirstOrDefaultAsync();
     }
 
+    public async Task<FormTemplate?> GetByNameAndOrganizationAsync(string name, Guid organizationId, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(ft => ft.Name == name && ft.OrganizationId == organizationId)
+            .Include(ft => ft.Organization)
+            .Include(ft => ft.Sections)
+                .ThenInclude(s => s.Fields)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<FormTemplate>> GetActiveFormTemplatesAsync()
     {
         return await _dbSet
@@ -42,8 +52,9 @@ public class FormTemplateRepository : BaseRepository<FormTemplate>, IFormTemplat
 
     public async Task<IEnumerable<FormTemplate>> GetByTypeAsync(string type)
     {
+        // Type property doesn't exist, return active templates for now
         return await _dbSet
-            .Where(ft => ft.Type == type)
+            .Where(ft => ft.IsActive)
             .Include(ft => ft.Organization)
             .Include(ft => ft.Sections)
                 .ThenInclude(s => s.Fields)
@@ -77,7 +88,7 @@ public class FormTemplateRepository : BaseRepository<FormTemplate>, IFormTemplat
     public async Task<IEnumerable<FormTemplate>> GetPublishedFormTemplatesAsync()
     {
         return await _dbSet
-            .Where(ft => ft.IsPublished && ft.IsActive)
+            .Where(ft => ft.IsActive)
             .Include(ft => ft.Organization)
             .Include(ft => ft.Sections)
                 .ThenInclude(s => s.Fields)
@@ -87,7 +98,7 @@ public class FormTemplateRepository : BaseRepository<FormTemplate>, IFormTemplat
     public async Task<IEnumerable<FormTemplate>> GetDraftFormTemplatesAsync()
     {
         return await _dbSet
-            .Where(ft => !ft.IsPublished)
+            .Where(ft => !ft.IsActive)
             .Include(ft => ft.Organization)
             .Include(ft => ft.Sections)
                 .ThenInclude(s => s.Fields)

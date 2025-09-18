@@ -73,7 +73,21 @@ try
     
     // Register email service
     builder.Services.AddScoped<SDIA.Core.Services.IEmailService, SDIA.API.Services.EmailService>();
-    
+
+    // Register notification logger service
+    builder.Services.AddScoped<SDIA.API.Services.INotificationLoggerService, SDIA.API.Services.NotificationLoggerService>();
+
+    // Add session support for public access
+    builder.Services.AddDistributedMemoryCache();
+    builder.Services.AddSession(options =>
+    {
+        options.IdleTimeout = TimeSpan.FromHours(4);
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.None;
+    });
+
     // Controllers
     builder.Services.AddControllers()
         .AddNewtonsoftJson(options =>
@@ -101,7 +115,8 @@ try
     
     app.UseHttpsRedirection();
     app.UseSerilogRequestLogging();
-    
+
+    app.UseSession(); // Add session middleware
     app.UseAuthentication();
     app.UseAuthorization();
     
@@ -119,7 +134,12 @@ try
             
             // Initialize with seed data
             await DbInitializer.InitializeAsync(scope.ServiceProvider);
-            
+
+            // Seed registration data (force = true in development to always have test data)
+            var dataSeeder = new DataSeeder(dbContext);
+            var isDevelopment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
+            await dataSeeder.SeedRegistrationsAsync(force: isDevelopment);
+
             Log.Information("Database initialized successfully with SQL Server");
         }
         catch (Exception ex)

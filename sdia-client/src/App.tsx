@@ -12,6 +12,9 @@ import ResetPassword from '@/pages/ResetPassword';
 import Dashboard from '@/pages/Dashboard';
 import RegistrationsDashboard from '@/pages/RegistrationsDashboard';
 import RegistrationDetail from '@/pages/RegistrationDetail';
+import RegistrationAccess from '@/pages/RegistrationAccess';
+import RegistrationEdit from '@/pages/RegistrationEdit';
+import RegistrationPublic from '@/pages/RegistrationPublic';
 import Users from '@/pages/Users';
 
 // Create a Material-UI theme
@@ -48,6 +51,9 @@ const App: React.FC = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/registration-access/:token" element={<RegistrationAccess />} />
+              <Route path="/registration-edit/:id" element={<RegistrationEdit />} />
+              <Route path="/registration-public/:token" element={<RegistrationPublic />} />
               <Route
                 path="/"
                 element={

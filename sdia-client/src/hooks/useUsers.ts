@@ -21,6 +21,8 @@ export const useUsers = (page: number = 1, pageSize: number = 20) => {
       });
       return response.data;
     },
+    retry: false, // Don't retry on 401 errors
+    refetchOnWindowFocus: false, // Don't refetch on window focus if there was an error
   });
 };
 

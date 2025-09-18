@@ -58,19 +58,24 @@ const Login: React.FC = () => {
   });
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // Only redirect if authenticated AND not loading
+    // This prevents redirect based on stale localStorage data
+    if (isAuthenticated && !isLoading) {
       navigate(from, { replace: true });
     }
-  }, [isAuthenticated, navigate, from]);
+  }, [isAuthenticated, isLoading, navigate, from]);
 
   const onSubmit = async (data: LoginFormData) => {
     try {
       setError('');
       await login(data.email, data.password);
-      navigate(from, { replace: true });
+      // After successful login, navigate to the intended page or dashboard
+      // Use dashboard as default if no specific page was requested
+      const targetPath = from === '/login' ? '/dashboard' : from;
+      navigate(targetPath, { replace: true });
     } catch (err: any) {
       setError(
-        err.response?.data?.message || 
+        err.response?.data?.message ||
         'Échec de la connexion. Vérifiez vos identifiants.'
       );
     }

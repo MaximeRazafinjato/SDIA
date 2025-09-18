@@ -40,7 +40,8 @@
       "Bash(dotnet ef migrations add:*)",
       "Bash(dotnet remove package:*)",
       "Bash(dotnet ef database update:*)",
-      "Bash(dotnet watch:*)"
+      "Bash(dotnet watch:*)",
+      "Bash(dotnet ef migrations remove:*)"
     ],
     "deny": [],
     "ask": []

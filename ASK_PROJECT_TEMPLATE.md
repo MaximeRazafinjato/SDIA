@@ -64,8 +64,7 @@ app-starter-kit/
         │   ├── _Services/
         │   └── [DomainName]/               # Par domaine métier
         │       ├── Entity.cs
-        │       ├── IEntityRepository.cs
-        │       └── EntityService.cs
+        │       └── IEntityRepository.cs
         │
         ├── AppStarterKit.Application/      # Logique applicative (CQRS)
         │   ├── _Abstractions/
@@ -80,6 +79,7 @@ app-starter-kit/
         │       │   │   └── EntityManagementGridModel.cs
         │       │   ├── Upsert/
         │       │   │   ├── EntityManagementUpsertService.cs
+        │       │   │   ├── EntityManagementUpsertValidator.cs
         │       │   │   └── EntityManagementUpsertModel.cs
         │       │   └── Delete/
         │       │       └── EntityManagementDeleteService.cs
@@ -129,12 +129,9 @@ app-starter-kit/
 
 <!-- AppStarterKit.Application -->
 <PackageReference Include="Ardalis.Result" Version="*" />
-<PackageReference Include="FluentValidation" Version="*" />
-<PackageReference Include="MediatR" Version="*" /> <!-- Si CQRS avec bus -->
 
 <!-- AppStarterKit.Infrastructure -->
 <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.*" />
-<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="*" /> <!-- Si PostgreSQL -->
 
 <!-- Tests -->
 <PackageReference Include="xunit" Version="*" />
@@ -178,9 +175,6 @@ builder.Services
     .AddApplication()    // Services Application
     .AddInfrastructure() // Services Infrastructure
     .AddSettings();      // Configuration Settings
-
-// Controllers avec Newtonsoft
-builder.Services.AddControllers().AddNewtonsoftJson();
 
 // OpenAPI/Swagger
 builder.Services.AddOpenApi();
@@ -283,7 +277,6 @@ public class UserManagementGridService(IUserRepository userRepository)
 {
     public async Task<Result<PaginatedEnumerable<UserManagementGridModel>>> ExecuteAsync(
         QueryOptionsModel queryOptions,
-        Guid connectedUserId,
         CancellationToken cancellationToken)
     {
         return await userRepository
@@ -310,8 +303,8 @@ public partial class UsersController : FTELBaseController
     public async Task<IActionResult> GetUsersGrid(
         [FromQuery] QueryOptionsModel queryOptions)
     {
-        var result = await _gridService.ExecuteAsync(queryOptions, UserId, CancellationToken);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Errors);
+        var result = await _gridService.ExecuteAsync(queryOptions, CancellationToken);
+        return FtelResult(result);
     }
 }
 ```
@@ -460,7 +453,7 @@ Pour créer un nouveau module métier :
 
 -   [ ] Créer l'entité dans Core/[Domain]/Entity.cs
 -   [ ] Créer l'interface repository dans Core/[Domain]/IEntityRepository.cs
--   [ ] Créer les services dans Application/[Domain]/Management/
+-   [ ] Créer les services dans Application/[Domain]/
 -   [ ] Implémenter le repository dans Infrastructure/Repositories/
 -   [ ] Créer la configuration EF dans Infrastructure/Configurations/
 -   [ ] Créer le controller dans API/Controllers/
@@ -481,7 +474,7 @@ Pour créer un nouveau module métier :
 
 1. **Authentification** : Cookie-based avec expiration sliding
 2. **Autorisation** : Basée sur les rôles et permissions
-3. **Validation** : Double validation (Frontend avec Zod, Backend avec FluentValidation)
+3. **Validation** : Double validation (Frontend avec Zod, Backend avec Ardalis.Result)
 4. **Logging** : Serilog avec différents niveaux et sinks
 5. **Error Handling** : GlobalExceptionHandler + React Error Boundaries
 6. **CORS** : Configuration stricte par environnement

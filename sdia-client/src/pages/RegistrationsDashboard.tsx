@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -44,8 +44,10 @@ import {
   Sort as SortIcon,
   Assignment as AssignmentIcon,
 } from '@mui/icons-material';
-import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
+import { GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import axios from '@/api/axios';
+import ActionDialog from '@/components/dialogs/ActionDialog';
+import RegistrationsDataGrid from '@/components/registrations/RegistrationsDataGrid';
 
 interface Registration {
   id: string;
@@ -85,9 +87,11 @@ const RegistrationsDashboard: React.FC = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [publicLinkDialogOpen, setPublicLinkDialogOpen] = useState(false);
   const [publicLink, setPublicLink] = useState('');
+  const [publicLinkCode, setPublicLinkCode] = useState('');
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'validate' | 'reject' | 'remind'>('validate');
   const [actionComments, setActionComments] = useState('');
+  const actionCommentsRef = useRef('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [tabValue, setTabValue] = useState(0);
 
@@ -129,22 +133,30 @@ const RegistrationsDashboard: React.FC = () => {
     fetchStats();
   }, [fetchRegistrations]);
 
-  const handleViewDetails = (id: string) => {
+  const handleViewDetails = useCallback((id: string) => {
     navigate(`/registrations/${id}`);
-  };
+  }, [navigate]);
 
-  const handleGeneratePublicLink = async (id: string) => {
+  const handleGeneratePublicLink = useCallback(async (id: string) => {
     try {
-      const response = await axios.get(`/api/registrations/${id}/public-link`);
-      setPublicLink(response.data.publicLink);
+      const response = await axios.post(`/api/registrations/${id}/generate-access-link`, {
+        sendNotification: true
+      });
+      setPublicLink(response.data.accessLink);
+      setPublicLinkCode(response.data.verificationCode);
+      setSelectedRegistration({
+        id,
+        notificationType: response.data.notificationType,
+        recipient: response.data.recipient
+      });
       setPublicLinkDialogOpen(true);
-      setSnackbar({ open: true, message: response.data.message || 'Lien généré avec succès', severity: 'success' });
+      setSnackbar({ open: true, message: 'Lien généré avec succès', severity: 'success' });
     } catch (error: any) {
       console.error('Error generating public link:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Erreur lors de la génération du lien';
       setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     }
-  };
+  }, []);
 
   const handleAction = async () => {
     if (!selectedRegistration) return;
@@ -175,14 +187,14 @@ const RegistrationsDashboard: React.FC = () => {
     }
   };
 
-  const openActionDialog = (registration: any, type: 'validate' | 'reject' | 'remind') => {
+  const openActionDialog = useCallback((registration: any, type: 'validate' | 'reject' | 'remind') => {
     setSelectedRegistration(registration);
     setActionType(type);
     setActionDialogOpen(true);
-  };
+  }, []);
 
   const getStatusColor = (status: string | number) => {
-    const statusStr = typeof status === 'number' ? status.toString() : status.toLowerCase();
+    const statusStr = typeof status === 'number' ? status.toString() : status?.toLowerCase() || '';
     switch (statusStr) {
       case '10':
       case '5':
@@ -222,7 +234,12 @@ const RegistrationsDashboard: React.FC = () => {
     return labels[key] || key;
   };
 
-  const columns: GridColDef[] = [
+  const handleActionCommentsChange = useCallback((value: string) => {
+    actionCommentsRef.current = value;
+    setActionComments(value);
+  }, []);
+
+  const columns: GridColDef[] = useMemo(() => [
     {
       field: 'registrationNumber',
       headerName: 'Numéro d\'inscription',
@@ -380,7 +397,7 @@ const RegistrationsDashboard: React.FC = () => {
         />,
       ],
     },
-  ];
+  ], [handleViewDetails, handleGeneratePublicLink, openActionDialog]);
 
   return (
     <PageLayout 
@@ -509,42 +526,17 @@ const RegistrationsDashboard: React.FC = () => {
         </Stack>
       </Paper>
 
-      {/* Data Grid */}
-      <Paper 
-        elevation={2} 
-        sx={{ 
-          width: '100%',
-          minHeight: 600,
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        <DataGrid
-          rows={registrations}
-          columns={columns}
-          rowCount={totalCount}
-          loading={loading}
-          pageSizeOptions={[10, 25, 50, 100]}
-          paginationModel={{ page, pageSize }}
-          paginationMode="server"
-          onPaginationModelChange={(model) => {
-            setPage(model.page);
-            setPageSize(model.pageSize);
-          }}
-          checkboxSelection
-          disableRowSelectionOnClick
-          density="comfortable"
-          autoHeight
-          sx={{...dataGridTheme,
-            '& .MuiDataGrid-toolbarContainer': {
-              padding: 2,
-              backgroundColor: 'background.default',
-              borderBottom: '1px solid',
-              borderColor: 'divider',
-            },
-          }}
-        />
-      </Paper>
+      {/* Data Grid - Isolated component for better performance */}
+      <RegistrationsDataGrid
+        rows={registrations}
+        columns={columns}
+        loading={loading}
+        page={page}
+        pageSize={pageSize}
+        total={totalCount}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
 
       {/* Detail Dialog */}
       <Dialog
@@ -558,7 +550,7 @@ const RegistrationsDashboard: React.FC = () => {
           {selectedRegistration && (
             <Chip
               label={getStatusLabel(selectedRegistration.status)}
-              color={getStatusColor(selectedRegistration.status)}
+              color={getStatusColor(selectedRegistration.status) as any}
               size="small"
               sx={{ ml: 2 }}
             />
@@ -692,13 +684,29 @@ const RegistrationsDashboard: React.FC = () => {
       <Dialog
         open={publicLinkDialogOpen}
         onClose={() => setPublicLinkDialogOpen(false)}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
       >
-        <DialogTitle>Lien public généré</DialogTitle>
+        <DialogTitle>Lien d'accès généré avec succès</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" gutterBottom>
-            Ce lien permet l'accès public au dossier d'inscription. Il expire dans 7 jours.
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Un lien d'accès a été généré et la notification a été envoyée par {selectedRegistration?.notificationType} à {selectedRegistration?.recipient}
+          </Alert>
+
+          <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+            Code de vérification
+          </Typography>
+          <Paper variant="outlined" sx={{ p: 2, mb: 3, textAlign: 'center', backgroundColor: '#f5f5f5' }}>
+            <Typography variant="h3" sx={{ fontFamily: 'monospace', letterSpacing: 4 }}>
+              {publicLinkCode}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Ce code expire dans 10 minutes
+            </Typography>
+          </Paper>
+
+          <Typography variant="h6" gutterBottom>
+            Lien d'accès
           </Typography>
           <TextField
             fullWidth
@@ -720,50 +728,32 @@ const RegistrationsDashboard: React.FC = () => {
               ),
             }}
           />
+
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Le lien est valable 24 heures. L'inscrit devra saisir le code de vérification pour accéder à son dossier.
+          </Typography>
+
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <Typography variant="body2">
+              Les détails de la notification ont été enregistrés dans le fichier de log :
+              <strong> logs/notifications/{new Date().toISOString().split('T')[0]}_{selectedRegistration?.notificationType?.toLowerCase() || 'notification'}.log</strong>
+            </Typography>
+          </Alert>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPublicLinkDialogOpen(false)}>Fermer</Button>
         </DialogActions>
       </Dialog>
 
-      {/* Action Dialog */}
-      <Dialog
+      {/* Action Dialog - Isolated component for better performance */}
+      <ActionDialog
         open={actionDialogOpen}
+        actionType={actionType}
+        actionComments={actionComments}
+        onCommentsChange={handleActionCommentsChange}
         onClose={() => setActionDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          {actionType === 'validate' ? 'Valider l\'inscription' :
-           actionType === 'reject' ? 'Rejeter l\'inscription' :
-           'Relancer le candidat'}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            label={actionType === 'reject' ? 'Raison du rejet (obligatoire)' : 'Commentaires (optionnel)'}
-            value={actionComments}
-            onChange={(e) => setActionComments(e.target.value)}
-            margin="normal"
-            required={actionType === 'reject'}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setActionDialogOpen(false)}>Annuler</Button>
-          <Button
-            onClick={handleAction}
-            variant="contained"
-            color={actionType === 'validate' ? 'success' : actionType === 'reject' ? 'error' : 'primary'}
-            disabled={actionType === 'reject' && !actionComments.trim()}
-          >
-            {actionType === 'validate' ? 'Valider' :
-             actionType === 'reject' ? 'Rejeter' :
-             'Envoyer la relance'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onConfirm={handleAction}
+      />
 
       {/* Snackbar */}
       <Snackbar
