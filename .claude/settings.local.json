@@ -41,7 +41,14 @@
       "Bash(dotnet remove package:*)",
       "Bash(dotnet ef database update:*)",
       "Bash(dotnet watch:*)",
-      "Bash(dotnet ef migrations remove:*)"
+      "Bash(dotnet ef migrations remove:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "mcp__puppeteer__puppeteer_navigate",
+      "mcp__puppeteer__puppeteer_screenshot",
+      "mcp__puppeteer__puppeteer_fill",
+      "mcp__puppeteer__puppeteer_click",
+      "mcp__puppeteer__puppeteer_evaluate"
     ],
     "deny": [],
     "ask": []

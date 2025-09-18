@@ -8,6 +8,8 @@ export const dataGridTheme: SxProps<Theme> = {
   '& .MuiDataGrid-cell': {
     borderBottom: '1px solid rgba(224, 224, 224, 0.4)',
     py: 1.5,
+    display: 'flex',
+    alignItems: 'center',
   },
   '& .MuiDataGrid-columnHeaders': {
     backgroundColor: 'primary.dark',
