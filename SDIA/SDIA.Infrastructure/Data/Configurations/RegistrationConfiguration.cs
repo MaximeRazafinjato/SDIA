@@ -36,7 +36,7 @@ public class RegistrationConfiguration : IEntityTypeConfiguration<Registration>
             
         builder.Property(r => r.Status)
             .IsRequired()
-            .HasConversion<string>();
+            .HasConversion<int>();
             
         builder.Property(r => r.FormData)
             .HasColumnType("nvarchar(max)");

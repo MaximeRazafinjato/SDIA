@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -120,32 +120,56 @@ const RegistrationsDashboard: React.FC = () => {
     severity: 'success' as 'success' | 'error',
   });
   const [tabValue, setTabValue] = useState(0);
+  const [, startTransition] = useTransition();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchRegistrations = useCallback(async () => {
+    // Cancel previous request if it exists
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: (page + 1).toString(),
-        pageSize: pageSize.toString(),
-        sortBy,
-        sortDesc: sortDesc.toString(),
-      });
+      const response = await axios.post(
+        '/api/registrations/grid',
+        {
+          page: page + 1,
+          pageSize,
+          sortBy,
+          sortDirection: sortDesc ? 'desc' : 'asc',
+          searchTerm: searchTerm || undefined,
+          status: statusFilter || undefined,
+        },
+        {
+          signal: abortController.signal,
+        },
+      );
 
-      if (searchTerm) params.append('search', searchTerm);
-      if (statusFilter) params.append('status', statusFilter);
-
-      const response = await axios.get(`/api/registrations?${params}`);
-      setRegistrations(response.data.items);
-      setTotalCount(response.data.totalCount);
+      // Only update state if the request wasn't cancelled
+      if (!abortController.signal.aborted) {
+        setRegistrations(response.data.data || []);
+        setTotalCount(response.data.totalCount || 0);
+      }
     } catch (error) {
-      console.error('Error fetching registrations:', error);
-      setSnackbar({
-        open: true,
-        message: 'Erreur lors du chargement des inscriptions',
-        severity: 'error',
-      });
+      // Ignore abort errors
+      const err = error as { name?: string; code?: string };
+      if (err?.name !== 'CanceledError' && err?.code !== 'ERR_CANCELED') {
+        console.error('Error fetching registrations:', error);
+        setSnackbar({
+          open: true,
+          message: 'Erreur lors du chargement des inscriptions',
+          severity: 'error',
+        });
+      }
     } finally {
-      setLoading(false);
+      if (!abortController.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [page, pageSize, searchTerm, statusFilter, sortBy, sortDesc]);
 
@@ -624,8 +648,17 @@ const RegistrationsDashboard: React.FC = () => {
         page={page}
         pageSize={pageSize}
         total={totalCount}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
+        onPageChange={(newPage) => {
+          startTransition(() => {
+            setPage(newPage);
+          });
+        }}
+        onPageSizeChange={(newPageSize) => {
+          startTransition(() => {
+            setPageSize(newPageSize);
+            setPage(0); // Reset to first page when page size changes
+          });
+        }}
       />
 
       {/* Detail Dialog */}

@@ -52,32 +52,35 @@ pnpm run format
 
 ## Architecture
 
-### Backend Structure (Clean Architecture + CQRS)
+### Backend Structure (Clean Architecture + Services Pattern)
 
 -   **SDIA.API**: REST API controllers, authentication (cookie-based)
--   **SDIA.Application**: CQRS implementation
+-   **SDIA.Application**: Services pattern implementation (NO MediatR, NO FluentValidation)
     -   Services organized by feature (Users, Registrations, FormTemplates)
-    -   Each operation has its own folder with Service, Model if needed, Validator if needed
+    -   Each operation has its own folder with Service, Validator, and Model
     -   Uses Result pattern (Ardalis.Result) for consistent error handling
-    -   Manual input validation (no Fluentvalidation)
-    -   Manual mapping methods for DTOs (no AutoMapper)
+    -   Separate Validator classes for input validation (NO FluentValidation)
+    -   Validation extensions in _Extensions for common validation patterns
+    -   Manual mapping methods for DTOs (NO AutoMapper)
 -   **SDIA.Core**: Domain entities, repository interfaces
 -   **SDIA.Infrastructure**: EF Core, repository implementations, external services
 -   **SDIA.SharedKernel**: Shared code, enums, base entities
 
-### CQRS Structure in Application Layer
+### Services Structure in Application Layer
 
 ```
 SDIA.Application/
+├── _Abstractions/     # IValidator interface
+├── _Extensions/       # ValidationExtensions with common validation helpers
 ├── Users/
 │   ├── Management/
-│   │   ├── Delete/    # UserManagementDeleteService, UserManagementDeleteValidator
-│   │   ├── GetById/   # UserManagementGetByIdService, UserManagementGetByIdValidator, UserManagementGetByIdModel
-│   │   ├── Grid/      # UserManagementGridService, UserManagementGridModel
+│   │   ├── Delete/    # UserManagementDeleteService
+│   │   ├── GetById/   # UserManagementGetByIdService, UserManagementGetByIdModel
+│   │   ├── Grid/      # UserManagementGridService, UserManagementGridModel, UserManagementGridQuery
 │   │   └── Upsert/    # UserManagementUpsertService, UserManagementUpsertValidator, UserManagementUpsertModel
 │   └── Me/
-│       ├── Get/       # UserMeGetService, UserMeGetValidator, UserMeGetModel
-│       └── UpdateLanguage/ # UserMeUpdateLanguageGetService, UserMeUpdateLanguageGetValidator, UserMeUpdateLanguageGetModel
+│       ├── Get/       # UserMeGetService, UserMeGetModel
+│       └── UpdateLanguage/ # UserMeUpdateLanguageService, UserMeUpdateLanguageModel
 ├── Registrations/
 │   └── Management/    # Similar structure as Users
 └── FormTemplates/
@@ -129,34 +132,119 @@ Key endpoints:
 -   Cookie authentication with SameSite=None for cross-origin requests
 -   Result pattern for consistent error handling across all operations
 -   Manual mapping methods for DTO transformations (type-safe, no reflection)
+-   **NO MediatR** - Use services directly with dependency injection
+-   **NO FluentValidation** - Use separate Validator classes with manual validation
+-   **NO AutoMapper** - Use manual mapping methods
 
-## CQRS Usage Examples
+## Services Usage Examples
 
-### Using Queries in Controllers
+### Using Services in Controllers with [FromServices]
 
 ```csharp
+[HttpGet("{id:Guid}")]
+public async Task<IActionResult> GetById(
+    Guid id,
+    [FromServices] UserManagementGetByIdService service,
+    CancellationToken cancellationToken)
+{
+    var result = await service.ExecuteAsync(id, cancellationToken);
 
-    [HttpGet("{id:Guid}")]
-    public async Task<IActionResult> GetById(Guid id,
-        [FromServices] UserManagementGetByIdService service,
-        CancellationToken cancellationToken)
+    if (!result.IsSuccess)
     {
-        var result = await service.ExecuteAsync(id, cancellationToken);
-
-        return FtelResult(result);
+        if (result.Status == Ardalis.Result.ResultStatus.NotFound)
+            return NotFound(new { message = result.Errors.FirstOrDefault() });
+        return BadRequest(result.Errors);
     }
+
+    return Ok(result.Value);
+}
 ```
 
-### Grid Queries with Pagination
+### Creating/Updating with Services
 
 ```csharp
 [HttpPost]
-public async Task<IActionResult> CreateUser([FromBody] UserManagementUpsertModel model,
-  [FromService] UserManagementUpsertService service,
-  CancellationToken cancellationToken)
+public async Task<IActionResult> CreateUser(
+    [FromBody] UserManagementUpsertModel model,
+    [FromServices] UserManagementUpsertService service,
+    CancellationToken cancellationToken)
 {
     var result = await service.ExecuteAsync(model, cancellationToken);
-    return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Errors);
+
+    if (!result.IsSuccess)
+    {
+        if (result.Status == Ardalis.Result.ResultStatus.Invalid)
+            return BadRequest(result.ValidationErrors);
+        return BadRequest(result.Errors);
+    }
+
+    return Ok(result.Value);
+}
+```
+
+### Validation Pattern with Separate Validator Classes
+
+```csharp
+// Validator class
+public class UserManagementUpsertValidator : IValidator
+{
+    private readonly IUserRepository _userRepository;
+
+    public UserManagementUpsertValidator(IUserRepository userRepository)
+    {
+        _userRepository = userRepository;
+    }
+
+    public async Task<Result> ValidateAsync(UserManagementUpsertModel model, CancellationToken cancellationToken, Guid? id = null)
+    {
+        var validationErrors = new List<ValidationError>();
+
+        // Using validation extensions
+        validationErrors.AddErrorIfNullOrWhiteSpace(model.Email, nameof(model.Email), "Email is required");
+        validationErrors.AddErrorIfNotEmail(model.Email, nameof(model.Email), "Invalid email format");
+        validationErrors.AddErrorIfExceedsLength(model.FirstName, 100, nameof(model.FirstName), "First name must not exceed 100 characters");
+
+        // Custom validation logic
+        if (!string.IsNullOrWhiteSpace(model.Email))
+        {
+            var existingUser = await _userRepository.GetByEmailAsync(model.Email, cancellationToken);
+            if (existingUser != null && existingUser.Id != id)
+            {
+                validationErrors.Add(new ValidationError {
+                    Identifier = nameof(model.Email),
+                    ErrorMessage = "Email already exists"
+                });
+            }
+        }
+
+        return validationErrors.Any() ? Result.Invalid(validationErrors) : Result.Success();
+    }
+}
+
+// Service class using the validator
+public class UserManagementUpsertService
+{
+    private readonly UserManagementUpsertValidator _validator;
+    private readonly IUserRepository _userRepository;
+
+    public UserManagementUpsertService(
+        UserManagementUpsertValidator validator,
+        IUserRepository userRepository)
+    {
+        _validator = validator;
+        _userRepository = userRepository;
+    }
+
+    public async Task<Result<UserManagementUpsertResult>> ExecuteAsync(UserManagementUpsertModel model, CancellationToken cancellationToken)
+    {
+        var validationResult = await _validator.ValidateAsync(model, cancellationToken, model.Id);
+        if (!validationResult.IsSuccess)
+        {
+            return Result<UserManagementUpsertResult>.Invalid(validationResult.ValidationErrors);
+        }
+
+        // Business logic here...
+    }
 }
 ```
 
@@ -168,7 +256,7 @@ Pour créer un nouveau module métier :
 
 -   [ ] Créer l'entité dans Core/[Domain]/Entity.cs
 -   [ ] Créer l'interface repository dans Core/[Domain]/IEntityRepository.cs
--   [ ] Créer les services dans Application/[Domain]/
+-   [ ] Créer les services et validators dans Application/[Domain]/
 -   [ ] Implémenter le repository dans Infrastructure/Repositories/
 -   [ ] Créer la configuration EF dans Infrastructure/Configurations/
 -   [ ] Créer le controller dans API/Controllers/
@@ -187,4 +275,8 @@ Pour créer un nouveau module métier :
 
 ## Configuration du Puppeteer MCP
 
--   Lance toujours le navigateur avec l'argument "args: ["--start-maximized"]" et en 1920x1080
+### Important Instructions for Claude
+
+-   **ALWAYS USE pnpm** instead of npm or yarn for all frontend operations
+-   If you can, **ALWAYS** implement features on the backend so that computations are handled by the server rather than the clien
+

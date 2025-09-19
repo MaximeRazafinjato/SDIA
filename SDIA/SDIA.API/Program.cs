@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
-using SDIA.API.Data;
+using SDIA.Infrastructure.Data;
+using SDIA.Application.Extensions;
+using SDIA.Infrastructure.Extensions;
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -67,9 +69,9 @@ try
     
     builder.Services.AddAuthorization();
     
-    // Add application services (temporarily commented out due to compilation errors)
-    // builder.Services.AddApplicationServices();
-    // builder.Services.AddInfrastructureServices(builder.Configuration);
+    // Add application services
+    builder.Services.AddApplicationServices();
+    builder.Services.AddInfrastructureServices(builder.Configuration);
     
     // Register email service
     builder.Services.AddScoped<SDIA.Core.Services.IEmailService, SDIA.API.Services.EmailService>();
@@ -135,10 +137,11 @@ try
             // Initialize with seed data
             await DbInitializer.InitializeAsync(scope.ServiceProvider);
 
-            // Seed registration data (force = true in development to always have test data)
-            var dataSeeder = new DataSeeder(dbContext);
-            var isDevelopment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
-            await dataSeeder.SeedRegistrationsAsync(force: isDevelopment);
+            // Seed registration data - temporarily disabled due to DbContext mismatch
+            // TODO: Move DataSeeder to Infrastructure layer
+            // var dataSeeder = new SDIA.API.Data.DataSeeder(dbContext);
+            // var isDevelopment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
+            // await dataSeeder.SeedRegistrationsAsync(force: isDevelopment);
 
             Log.Information("Database initialized successfully with SQL Server");
         }

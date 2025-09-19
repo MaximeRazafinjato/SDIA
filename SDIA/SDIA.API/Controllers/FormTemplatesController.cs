@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using SDIA.API.Data;
+using SDIA.Infrastructure.Data;
 using SDIA.API.Models.FormTemplates;
 using SDIA.Core.FormTemplates;
+using SDIA.Application.FormTemplates.Management.Grid;
 using System.Security.Claims;
 
 namespace SDIA.API.Controllers;
@@ -19,6 +20,26 @@ public class FormTemplatesController : ControllerBase
     {
         _logger = logger;
         _context = context;
+    }
+
+    /// <summary>
+    /// Get form templates grid (POST)
+    /// </summary>
+    [HttpPost("grid")]
+    [Authorize]
+    public async Task<IActionResult> GetGrid(
+        [FromBody] FormTemplateManagementGridQuery query,
+        [FromServices] FormTemplateManagementGridService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ExecuteAsync(query, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result.Errors);
+        }
+
+        return Ok(result.Value);
     }
 
     /// <summary>

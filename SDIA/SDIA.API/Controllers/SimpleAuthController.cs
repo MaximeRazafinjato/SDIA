@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using SDIA.Core.Users;
 using SDIA.API.Models.Auth;
-using SDIA.API.Data;
+using SDIA.Infrastructure.Data;
 using SDIA.Core.Services;
 using System.Security.Cryptography;
 

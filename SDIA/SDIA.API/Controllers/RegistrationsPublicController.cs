@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using SDIA.API.Data;
+using SDIA.Infrastructure.Data;
 using SDIA.API.Models.Registrations;
 using SDIA.API.Services;
 using SDIA.Core.Registrations;

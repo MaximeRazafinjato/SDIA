@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using SDIA.API.Data;
+using SDIA.Infrastructure.Data;
 using SDIA.API.Services;
 using SDIA.SharedKernel.Enums;
 using System.Security.Cryptography;

@@ -18,10 +18,13 @@ export interface UserList {
   email: string;
   firstName: string;
   lastName: string;
+  phone: string;
   role: string;
   isActive: boolean;
   emailConfirmed: boolean;
+  phoneConfirmed: boolean;
   lastLoginAt?: string;
+  organizationName?: string;
   createdAt: string;
 }
 
@@ -44,11 +47,13 @@ export interface UpdateUser {
 }
 
 export interface UsersResponse {
-  items: UserList[];
+  data: UserList[];
   totalCount: number;
   page: number;
   pageSize: number;
   totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 }
 
 export interface UserStats {

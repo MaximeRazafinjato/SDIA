@@ -382,7 +382,7 @@ const Users: React.FC = () => {
       >
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
           <DataGrid
-            rows={usersData?.items || []}
+            rows={usersData?.data || []}
             columns={columns}
             loading={isLoading}
             paginationMode="server"

@@ -22,9 +22,8 @@
   <ItemGroup>
     <ProjectReference Include="..\SDIA.SharedKernel\SDIA.SharedKernel.csproj" />
     <ProjectReference Include="..\SDIA.Core\SDIA.Core.csproj" />
-    <!-- Temporarily commenting problematic projects -->
-    <!-- <ProjectReference Include="..\SDIA.Infrastructure\SDIA.Infrastructure.csproj" /> -->
-    <!-- <ProjectReference Include="..\SDIA.Application\SDIA.Application.csproj" /> -->
+    <ProjectReference Include="..\SDIA.Infrastructure\SDIA.Infrastructure.csproj" />
+    <ProjectReference Include="..\SDIA.Application\SDIA.Application.csproj" />
   </ItemGroup>
 
 </Project>

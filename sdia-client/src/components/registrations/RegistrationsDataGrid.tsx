@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { DataGrid, GridColDef, GridValidRowModel } from '@mui/x-data-grid';
-import { Paper } from '@mui/material';
+import { Paper, LinearProgress, Box } from '@mui/material';
 import { dataGridTheme } from '@/styles/dataGridTheme';
 
 interface DataGridRow extends GridValidRowModel {
@@ -29,8 +29,14 @@ const RegistrationsDataGrid: React.FC<RegistrationsDataGridProps> = memo(
           borderColor: '#E0E0E0',
           borderRadius: 2,
           overflow: 'hidden',
+          position: 'relative',
         }}
       >
+        {loading && (
+          <Box sx={{ width: '100%', position: 'absolute', top: 0, zIndex: 1 }}>
+            <LinearProgress />
+          </Box>
+        )}
         <DataGrid
           rows={rows}
           columns={columns}
@@ -55,7 +61,17 @@ const RegistrationsDataGrid: React.FC<RegistrationsDataGridProps> = memo(
               labelRowsPerPage: 'Lignes par page:',
             },
           }}
-          sx={dataGridTheme}
+          sx={{
+            ...dataGridTheme,
+            opacity: loading ? 0.5 : 1,
+            transition: 'opacity 0.2s',
+          }}
+          slotProps={{
+            loadingOverlay: {
+              variant: 'linear-progress',
+              noRowsVariant: 'linear-progress',
+            },
+          }}
         />
       </Paper>
     );

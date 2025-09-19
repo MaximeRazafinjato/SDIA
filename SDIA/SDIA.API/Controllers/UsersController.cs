@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using SDIA.API.Data;
+using SDIA.Infrastructure.Data;
 using SDIA.API.Models.Users;
+using SDIA.Application.Users.Management.GetById;
+using SDIA.Application.Users.Management.Grid;
+using SDIA.Application.Users.Management.Upsert;
+using SDIA.Application.Users.Management.Delete;
 using SDIA.Core.Users;
 using System.Security.Claims;
 using SimpleUser = SDIA.Core.Users.User;
@@ -25,219 +29,114 @@ public class UsersController : ControllerBase
         _configuration = configuration;
     }
 
-    [HttpGet]
-    public async Task<IActionResult> GetUsers([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    [HttpPost("grid")]
+    public async Task<IActionResult> GetUsersGrid(
+        [FromBody] UserManagementGridQuery query,
+        [FromServices] UserManagementGridService service,
+        CancellationToken cancellationToken)
     {
-        try
-        {
-            var query = _context.Users.Where(u => !u.IsDeleted);
-            
-            var totalCount = await query.CountAsync();
-            var users = await query
-                .OrderBy(u => u.LastName)
-                .ThenBy(u => u.FirstName)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(u => new UserListDto
-                {
-                    Id = u.Id,
-                    Email = u.Email,
-                    FirstName = u.FirstName,
-                    LastName = u.LastName,
-                    Role = u.Role,
-                    IsActive = u.IsActive,
-                    EmailConfirmed = u.EmailConfirmed,
-                    LastLoginAt = u.LastLoginAt,
-                    CreatedAt = u.CreatedAt
-                })
-                .ToListAsync();
+        var result = await service.ExecuteAsync(query, cancellationToken);
 
-            return Ok(new
-            {
-                items = users,
-                totalCount,
-                page,
-                pageSize,
-                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
-            });
-        }
-        catch (Exception ex)
+        if (!result.IsSuccess)
         {
-            _logger.LogError(ex, "Error getting users");
-            return StatusCode(500, new { message = "An error occurred while fetching users" });
+            return BadRequest(result.Errors);
         }
+
+        return Ok(result.Value);
     }
 
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetUser(Guid id)
+    [HttpGet("{id:Guid}")]
+    public async Task<IActionResult> GetById(
+        Guid id,
+        [FromServices] UserManagementGetByIdService service,
+        CancellationToken cancellationToken)
     {
-        try
-        {
-            var user = await _context.Users
-                .Where(u => u.Id == id && !u.IsDeleted)
-                .Select(u => new UserDetailDto
-                {
-                    Id = u.Id,
-                    Email = u.Email,
-                    FirstName = u.FirstName,
-                    LastName = u.LastName,
-                    Phone = u.Phone,
-                    Role = u.Role,
-                    IsActive = u.IsActive,
-                    EmailConfirmed = u.EmailConfirmed,
-                    PhoneConfirmed = u.PhoneConfirmed,
-                    LastLoginAt = u.LastLoginAt,
-                    CreatedAt = u.CreatedAt,
-                    UpdatedAt = u.UpdatedAt
-                })
-                .FirstOrDefaultAsync();
+        var result = await service.ExecuteAsync(id, cancellationToken);
 
-            if (user == null)
+        if (!result.IsSuccess)
+        {
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
             {
-                return NotFound(new { message = "User not found" });
+                return NotFound(new { message = result.Errors.FirstOrDefault() });
             }
+            return BadRequest(result.Errors);
+        }
 
-            return Ok(user);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting user {Id}", id);
-            return StatusCode(500, new { message = "An error occurred" });
-        }
+        return Ok(result.Value);
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
+    public async Task<IActionResult> CreateUser(
+        [FromBody] UserManagementUpsertModel model,
+        [FromServices] UserManagementUpsertService service,
+        CancellationToken cancellationToken)
     {
-        try
+        var result = await service.ExecuteAsync(model, cancellationToken);
+
+        if (!result.IsSuccess)
         {
-            // Check if email already exists
-            if (await _context.Users.AnyAsync(u => u.Email == dto.Email && !u.IsDeleted))
+            if (result.Status == Ardalis.Result.ResultStatus.Invalid)
             {
-                return BadRequest(new { message = "Email already exists" });
+                return BadRequest(result.ValidationErrors);
             }
-
-            var user = new SimpleUser
-            {
-                Id = Guid.NewGuid(),
-                Email = dto.Email,
-                FirstName = dto.FirstName,
-                LastName = dto.LastName,
-                Phone = dto.Phone,
-                Role = dto.Role,
-                IsActive = false, // Account inactive until email validation
-                EmailConfirmed = false,
-                PhoneConfirmed = false,
-                OrganizationId = dto.OrganizationId,
-                CreatedAt = DateTime.UtcNow,
-                EmailVerificationToken = Guid.NewGuid().ToString()
-            };
-
-            // Generate temporary password
-            var tempPassword = GenerateTemporaryPassword();
-            user.SetPassword(tempPassword);
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            // Send validation email
-            await SendValidationEmail(user, tempPassword);
-
-            _logger.LogInformation("User {Email} created successfully", user.Email);
-
-            return Ok(new
-            {
-                id = user.Id,
-                message = "User created successfully. Validation email sent.",
-                email = user.Email
-            });
+            return BadRequest(result.Errors);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating user");
-            return StatusCode(500, new { message = "An error occurred while creating the user" });
-        }
+
+        return Ok(result.Value);
     }
 
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserDto dto)
+    [HttpPut("{id:Guid}")]
+    public async Task<IActionResult> UpdateUser(
+        Guid id,
+        [FromBody] UserManagementUpsertModel model,
+        [FromServices] UserManagementUpsertService service,
+        CancellationToken cancellationToken)
     {
-        try
+        model.Id = id;
+        var result = await service.ExecuteAsync(model, cancellationToken);
+
+        if (!result.IsSuccess)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
-            if (user == null)
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
             {
-                return NotFound(new { message = "User not found" });
+                return NotFound(new { message = result.Errors.FirstOrDefault() });
             }
-
-            // Check if email is being changed and already exists
-            if (user.Email != dto.Email && await _context.Users.AnyAsync(u => u.Email == dto.Email && u.Id != id && !u.IsDeleted))
+            if (result.Status == Ardalis.Result.ResultStatus.Invalid)
             {
-                return BadRequest(new { message = "Email already exists" });
+                return BadRequest(result.ValidationErrors);
             }
-
-            user.Email = dto.Email;
-            user.FirstName = dto.FirstName;
-            user.LastName = dto.LastName;
-            user.Phone = dto.Phone;
-            user.Role = dto.Role;
-            user.IsActive = dto.IsActive;
-            user.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("User {Id} updated successfully", id);
-
-            return Ok(new { message = "User updated successfully" });
+            return BadRequest(result.Errors);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating user {Id}", id);
-            return StatusCode(500, new { message = "An error occurred while updating the user" });
-        }
+
+        return Ok(result.Value);
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:Guid}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> DeleteUser(Guid id)
+    public async Task<IActionResult> DeleteUser(
+        Guid id,
+        [FromServices] UserManagementDeleteService service,
+        CancellationToken cancellationToken)
     {
-        try
+        // Prevent deleting the current user
+        var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (currentUserId == id.ToString())
         {
-            // Prevent deleting the current user
-            var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (currentUserId == id.ToString())
-            {
-                return BadRequest(new { message = "Cannot delete your own account" });
-            }
-
-            // Check if this is the last admin
-            var adminCount = await _context.Users.CountAsync(u => u.Role == "Admin" && !u.IsDeleted);
-            var userToDelete = await _context.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
-
-            if (userToDelete == null)
-            {
-                return NotFound(new { message = "User not found" });
-            }
-
-            if (userToDelete.Role == "Admin" && adminCount <= 1)
-            {
-                return BadRequest(new { message = "Cannot delete the last administrator" });
-            }
-
-            // Soft delete
-            userToDelete.IsDeleted = true;
-            userToDelete.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("User {Id} deleted successfully", id);
-
-            return Ok(new { message = "User deleted successfully" });
+            return BadRequest(new { message = "Cannot delete your own account" });
         }
-        catch (Exception ex)
+
+        var result = await service.ExecuteAsync(id, cancellationToken);
+
+        if (!result.IsSuccess)
         {
-            _logger.LogError(ex, "Error deleting user {Id}", id);
-            return StatusCode(500, new { message = "An error occurred while deleting the user" });
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
+            {
+                return NotFound(new { message = result.Errors.FirstOrDefault() });
+            }
+            return BadRequest(result.Errors);
         }
+
+        return Ok(new { message = "User deleted successfully" });
     }
 
     [HttpPost("{id}/resend-validation")]
@@ -258,11 +157,11 @@ public class UsersController : ControllerBase
 
             // Generate new verification token
             user.EmailVerificationToken = Guid.NewGuid().ToString();
-            
+
             // Generate new temporary password
             var tempPassword = GenerateTemporaryPassword();
             user.SetPassword(tempPassword);
-            
+
             await _context.SaveChangesAsync();
 
             // Resend validation email
@@ -294,7 +193,7 @@ public class UsersController : ControllerBase
             var tempPassword = GenerateTemporaryPassword();
             user.SetPassword(tempPassword);
             user.UpdatedAt = DateTime.UtcNow;
-            
+
             await _context.SaveChangesAsync();
 
             // Send password reset email
@@ -352,7 +251,7 @@ public class UsersController : ControllerBase
     {
         var baseUrl = _configuration["AppSettings:BaseUrl"] ?? "https://localhost:5173";
         var validationUrl = $"{baseUrl}/validate-account?token={user.EmailVerificationToken}&email={Uri.EscapeDataString(user.Email)}";
-        
+
         var emailContent = $@"
             <h2>Bienvenue sur SDIA</h2>
             <p>Bonjour {user.FirstName} {user.LastName},</p>
@@ -375,7 +274,7 @@ public class UsersController : ControllerBase
     private async Task SendPasswordResetEmail(SimpleUser user, string tempPassword)
     {
         var baseUrl = _configuration["AppSettings:BaseUrl"] ?? "https://localhost:5173";
-        
+
         var emailContent = $@"
             <h2>Réinitialisation de votre mot de passe</h2>
             <p>Bonjour {user.FirstName} {user.LastName},</p>

@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using SDIA.API.Data;
+using SDIA.Infrastructure.Data;
 using SDIA.API.Models.Registrations;
 using SDIA.API.Services;
 using SDIA.Core.Registrations;
 using SDIA.SharedKernel.Enums;
+using SDIA.Application.Registrations.Management.Grid;
 using System.Security.Claims;
 using System.Security.Cryptography;
 
@@ -33,6 +34,26 @@ public class RegistrationsController : ControllerBase
     }
 
     /// <summary>
+    /// Get registrations grid (POST)
+    /// </summary>
+    [HttpPost("grid")]
+    [Authorize]
+    public async Task<IActionResult> GetGrid(
+        [FromBody] RegistrationManagementGridQuery query,
+        [FromServices] RegistrationManagementGridService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ExecuteAsync(query, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result.Errors);
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     /// Get registration statistics
     /// </summary>
     [HttpGet("stats")]
@@ -41,10 +62,11 @@ public class RegistrationsController : ControllerBase
     {
         try
         {
-            var stats = await _context.Registrations
+            var allRegistrations = await _context.Registrations.ToListAsync();
+            var stats = allRegistrations
                 .GroupBy(r => r.Status)
                 .Select(g => new { Status = g.Key, Count = g.Count() })
-                .ToListAsync();
+                .ToList();
 
             var total = stats.Sum(s => s.Count);
             var pendingCount = stats.FirstOrDefault(s => s.Status == RegistrationStatus.Pending)?.Count ?? 0;

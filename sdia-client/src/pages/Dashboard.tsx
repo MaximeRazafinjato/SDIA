@@ -83,7 +83,7 @@ const Dashboard: React.FC = () => {
     setError(null);
     try {
       // Fetch users count
-      const usersResponse = await api.get('/api/users?pageSize=1');
+      const usersResponse = await api.post('/api/users/grid', { pageSize: 1 });
       const totalUsers = usersResponse.data.totalCount || 0;
 
       // Fetch registration statistics
@@ -91,7 +91,7 @@ const Dashboard: React.FC = () => {
       const registrationStats = registrationStatsResponse.data;
 
       // Fetch form templates count
-      const formTemplatesResponse = await api.get('/api/form-templates?pageSize=1');
+      const formTemplatesResponse = await api.post('/api/form-templates/grid', { pageSize: 1 });
       const totalFormTemplates = formTemplatesResponse.data.totalCount || 0;
 
       setStats({

@@ -9,8 +9,9 @@ export const useUsers = (page: number = 1, pageSize: number = 20) => {
   return useQuery({
     queryKey: [USERS_QUERY_KEY, { page, pageSize }],
     queryFn: async (): Promise<UsersResponse> => {
-      const response = await apiClient.get('/api/users', {
-        params: { page, pageSize },
+      const response = await apiClient.post('/api/users/grid', {
+        page,
+        pageSize,
       });
       return response.data;
     },
