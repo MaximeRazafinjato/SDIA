@@ -18,18 +18,15 @@ public class RegistrationManagementGridService
     {
         var dbQuery = await _registrationRepository.GetQueryableAsync();
 
-        // Apply filters
-        if (!string.IsNullOrEmpty(query.SearchTerm))
-        {
-            var searchTerm = query.SearchTerm.ToLower();
-            dbQuery = dbQuery.Where(x =>
-                x.FirstName.ToLower().Contains(searchTerm) ||
-                x.LastName.ToLower().Contains(searchTerm) ||
-                x.Email.ToLower().Contains(searchTerm) ||
-                x.Phone.Contains(searchTerm) ||
-                x.RegistrationNumber.ToLower().Contains(searchTerm));
-        }
+        // Apply text search using the new extension
+        dbQuery = dbQuery.ApplyTextSearch(query.SearchTerm,
+            x => x.FirstName,
+            x => x.LastName,
+            x => x.Email,
+            x => x.Phone,
+            x => x.RegistrationNumber);
 
+        // Apply specific filters
         if (query.Status.HasValue)
         {
             dbQuery = dbQuery.Where(x => x.Status == query.Status.Value);
@@ -50,6 +47,7 @@ public class RegistrationManagementGridService
             dbQuery = dbQuery.Where(x => x.AssignedToUserId == query.AssignedToUserId.Value);
         }
 
+        // Submission date filters
         if (query.SubmittedFrom.HasValue)
         {
             dbQuery = dbQuery.Where(x => x.SubmittedAt >= query.SubmittedFrom.Value);
@@ -60,6 +58,40 @@ public class RegistrationManagementGridService
             dbQuery = dbQuery.Where(x => x.SubmittedAt <= query.SubmittedTo.Value);
         }
 
+        // Creation date filters
+        if (query.CreatedFrom.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.CreatedAt >= query.CreatedFrom.Value);
+        }
+
+        if (query.CreatedTo.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.CreatedAt <= query.CreatedTo.Value);
+        }
+
+        // Validation date filters
+        if (query.ValidatedFrom.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.ValidatedAt >= query.ValidatedFrom.Value);
+        }
+
+        if (query.ValidatedTo.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.ValidatedAt <= query.ValidatedTo.Value);
+        }
+
+        // Rejection date filters
+        if (query.RejectedFrom.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.RejectedAt >= query.RejectedFrom.Value);
+        }
+
+        if (query.RejectedTo.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.RejectedAt <= query.RejectedTo.Value);
+        }
+
+        // Verification filters
         if (query.EmailVerified.HasValue)
         {
             dbQuery = dbQuery.Where(x => x.EmailVerified == query.EmailVerified.Value);
@@ -70,17 +102,38 @@ public class RegistrationManagementGridService
             dbQuery = dbQuery.Where(x => x.PhoneVerified == query.PhoneVerified.Value);
         }
 
-        // First get total count from the database query
+        // Minor status filter
+        if (query.IsMinor.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.IsMinor == query.IsMinor.Value);
+        }
+
+        // Age range filters (only apply if BirthDate is provided)
+        if (query.AgeFrom.HasValue)
+        {
+            var maxBirthDate = DateTime.Today.AddYears(-query.AgeFrom.Value);
+            dbQuery = dbQuery.Where(x => x.BirthDate <= maxBirthDate);
+        }
+
+        if (query.AgeTo.HasValue)
+        {
+            var minBirthDate = DateTime.Today.AddYears(-query.AgeTo.Value - 1);
+            dbQuery = dbQuery.Where(x => x.BirthDate >= minBirthDate);
+        }
+
+        // Get total count first
         var totalCount = await Task.Run(() => dbQuery.Count(), cancellationToken);
 
-        // Apply paging and sorting, then materialize
-        var items = await Task.Run(() => dbQuery
+        // Apply sorting and paging on the entity query
+        var pagedQuery = dbQuery
             .ApplySorting(query.SortBy, query.SortDescending)
-            .ApplyPaging(query.Page, query.PageSize)
-            .ToList(), cancellationToken);
+            .ApplyPaging(query.Page, query.PageSize);
+
+        // Materialize the results
+        var entities = await Task.Run(() => pagedQuery.ToList(), cancellationToken);
 
         // Map to models in memory
-        var mappedItems = items.Select(x => MapToGridModel(x)).ToList();
+        var mappedItems = entities.Select(x => MapToGridModel(x)).ToList();
 
         var result = new GridResult<RegistrationManagementGridModel>
         {

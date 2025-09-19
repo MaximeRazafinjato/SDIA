@@ -1,17 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { User, UsersResponse, CreateUser, UpdateUser, UserStats } from '@/types/user';
+import { UserFilters } from '@/types/filters';
 
 const USERS_QUERY_KEY = 'users';
 
-// Fetch all users with pagination
-export const useUsers = (page: number = 1, pageSize: number = 20) => {
+// Fetch all users with pagination and filters
+export const useUsers = (filters: Partial<UserFilters> = {}) => {
+  const { page = 1, pageSize = 20, ...otherFilters } = filters;
+
   return useQuery({
-    queryKey: [USERS_QUERY_KEY, { page, pageSize }],
+    queryKey: [USERS_QUERY_KEY, { page, pageSize, ...otherFilters }],
     queryFn: async (): Promise<UsersResponse> => {
       const response = await apiClient.post('/api/users/grid', {
         page,
         pageSize,
+        ...otherFilters,
       });
       return response.data;
     },

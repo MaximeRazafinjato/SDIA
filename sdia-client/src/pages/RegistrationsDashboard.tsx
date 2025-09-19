@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   Box,
   Paper,
@@ -101,6 +102,7 @@ const RegistrationsDashboard: React.FC = () => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [sortBy, setSortBy] = useState('CreatedAt');
   const [sortDesc, setSortDesc] = useState(true);
@@ -142,7 +144,7 @@ const RegistrationsDashboard: React.FC = () => {
           pageSize,
           sortBy,
           sortDirection: sortDesc ? 'desc' : 'asc',
-          searchTerm: searchTerm || undefined,
+          searchTerm: debouncedSearchTerm || undefined,
           status: statusFilter || undefined,
         },
         {
@@ -171,7 +173,7 @@ const RegistrationsDashboard: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [page, pageSize, searchTerm, statusFilter, sortBy, sortDesc]);
+  }, [page, pageSize, debouncedSearchTerm, statusFilter, sortBy, sortDesc]);
 
   const fetchStats = async () => {
     try {

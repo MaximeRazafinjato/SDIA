@@ -58,7 +58,8 @@
       "Bash(dotnet test:*)",
       "Bash(dir C:FilesProjectsASKapp-starter-kit)",
       "Read(//c/Files/Projects/ASK/app-starter-kit/**)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(pnpm add:*)"
     ],
     "deny": [],
     "ask": []

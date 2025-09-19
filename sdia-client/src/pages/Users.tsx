@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Button,
@@ -44,10 +44,16 @@ import {
   useResetUserPassword,
 } from '@/hooks/useUsers';
 import { CreateUser, UpdateUser, UserList } from '@/types/user';
+import { UserFilters } from '@/types/filters';
+import UserFiltersBar from '@/components/filters/UserFiltersBar';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const Users: React.FC = () => {
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [filters, setFilters] = useState<Partial<UserFilters>>({
+    page: 1,
+    pageSize: 10,
+  });
+  const [sortModel, setSortModel] = useState<{ field: string; sort: 'asc' | 'desc' | null }[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -58,8 +64,18 @@ const Users: React.FC = () => {
     severity: 'success' as 'success' | 'error',
   });
 
+  // Build filters with sorting
+  const queryFilters = useMemo(() => {
+    const sort = sortModel[0];
+    return {
+      ...filters,
+      sortBy: sort?.field,
+      sortDescending: sort?.sort === 'desc',
+    };
+  }, [filters, sortModel]);
+
   // Queries and mutations
-  const { data: usersData, isLoading, refetch } = useUsers(page + 1, pageSize);
+  const { data: usersData, isLoading, refetch } = useUsers(queryFilters);
   const createUserMutation = useCreateUser();
   const updateUserMutation = useUpdateUser();
   const deleteUserMutation = useDeleteUser();
@@ -367,6 +383,11 @@ const Users: React.FC = () => {
         </Button>
       }
     >
+      <UserFiltersBar
+        filters={filters}
+        onFiltersChange={(newFilters) => setFilters({ ...newFilters, page: 1 })}
+      />
+
       <Paper
         sx={{
           p: 3,
@@ -387,10 +408,16 @@ const Users: React.FC = () => {
             loading={isLoading}
             paginationMode="server"
             rowCount={usersData?.totalCount || 0}
-            paginationModel={{ page, pageSize }}
+            sortingMode="server"
+            sortModel={sortModel}
+            onSortModelChange={setSortModel}
+            paginationModel={{ page: (filters.page || 1) - 1, pageSize: filters.pageSize || 10 }}
             onPaginationModelChange={(model) => {
-              setPage(model.page);
-              setPageSize(model.pageSize);
+              setFilters({
+                ...filters,
+                page: model.page + 1,
+                pageSize: model.pageSize,
+              });
             }}
             pageSizeOptions={[5, 10, 25, 50]}
             disableRowSelectionOnClick

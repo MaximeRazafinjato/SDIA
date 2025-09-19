@@ -18,17 +18,14 @@ public class UserManagementGridService
     {
         var dbQuery = await _userRepository.GetQueryableAsync();
 
-        // Apply filters
-        if (!string.IsNullOrEmpty(query.SearchTerm))
-        {
-            var searchTerm = query.SearchTerm.ToLower();
-            dbQuery = dbQuery.Where(x =>
-                x.FirstName.ToLower().Contains(searchTerm) ||
-                x.LastName.ToLower().Contains(searchTerm) ||
-                x.Email.ToLower().Contains(searchTerm) ||
-                x.Phone.Contains(searchTerm));
-        }
+        // Apply text search using the new extension
+        dbQuery = dbQuery.ApplyTextSearch(query.SearchTerm,
+            x => x.FirstName,
+            x => x.LastName,
+            x => x.Email,
+            x => x.Phone);
 
+        // Apply specific filters
         if (!string.IsNullOrEmpty(query.Role))
         {
             dbQuery = dbQuery.Where(x => x.Role == query.Role);
@@ -39,15 +36,63 @@ public class UserManagementGridService
             dbQuery = dbQuery.Where(x => x.IsActive == query.IsActive.Value);
         }
 
+        if (query.EmailConfirmed.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.EmailConfirmed == query.EmailConfirmed.Value);
+        }
+
+        if (query.PhoneConfirmed.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.PhoneConfirmed == query.PhoneConfirmed.Value);
+        }
+
         if (query.OrganizationId.HasValue)
         {
             dbQuery = dbQuery.Where(x => x.OrganizationId == query.OrganizationId.Value);
         }
 
-        // Map to models
-        var mappedQuery = dbQuery.Select(x => MapToGridModel(x));
+        // Date range filters
+        if (query.CreatedFrom.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.CreatedAt >= query.CreatedFrom.Value);
+        }
 
-        var result = await mappedQuery.ToGridResultAsync(query, cancellationToken);
+        if (query.CreatedTo.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.CreatedAt <= query.CreatedTo.Value);
+        }
+
+        if (query.LastLoginFrom.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.LastLoginAt >= query.LastLoginFrom.Value);
+        }
+
+        if (query.LastLoginTo.HasValue)
+        {
+            dbQuery = dbQuery.Where(x => x.LastLoginAt <= query.LastLoginTo.Value);
+        }
+
+        // Get total count first
+        var totalCount = await Task.Run(() => dbQuery.Count(), cancellationToken);
+
+        // Apply sorting and paging on the entity query
+        var pagedQuery = dbQuery
+            .ApplySorting(query.SortBy, query.SortDescending)
+            .ApplyPaging(query.Page, query.PageSize);
+
+        // Materialize the results
+        var entities = await Task.Run(() => pagedQuery.ToList(), cancellationToken);
+
+        // Map to models in memory
+        var mappedItems = entities.Select(x => MapToGridModel(x)).ToList();
+
+        var result = new GridResult<UserManagementGridModel>
+        {
+            Data = mappedItems,
+            TotalCount = totalCount,
+            Page = query.Page,
+            PageSize = query.PageSize
+        };
 
         return Result<GridResult<UserManagementGridModel>>.Success(result);
     }

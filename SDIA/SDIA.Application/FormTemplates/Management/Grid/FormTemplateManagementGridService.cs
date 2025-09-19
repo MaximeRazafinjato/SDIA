@@ -20,16 +20,13 @@ public class FormTemplateManagementGridService
     {
         var dbQuery = await _formTemplateRepository.GetQueryableAsync();
 
-        // Apply filters
-        if (!string.IsNullOrEmpty(query.SearchTerm))
-        {
-            var searchTerm = query.SearchTerm.ToLower();
-            dbQuery = dbQuery.Where(x =>
-                x.Name.ToLower().Contains(searchTerm) ||
-                x.Description.ToLower().Contains(searchTerm) ||
-                x.Version.ToLower().Contains(searchTerm));
-        }
+        // Apply text search using the new extension
+        dbQuery = dbQuery.ApplyTextSearch(query.SearchTerm,
+            x => x.Name,
+            x => x.Description,
+            x => x.Version);
 
+        // Apply specific filters
         if (query.IsActive.HasValue)
         {
             dbQuery = dbQuery.Where(x => x.IsActive == query.IsActive.Value);
@@ -40,10 +37,27 @@ public class FormTemplateManagementGridService
             dbQuery = dbQuery.Where(x => x.OrganizationId == query.OrganizationId.Value);
         }
 
-        // Map to models
-        var mappedQuery = dbQuery.Select(x => MapToGridModel(x));
+        // Get total count first
+        var totalCount = await Task.Run(() => dbQuery.Count(), cancellationToken);
 
-        var result = await mappedQuery.ToGridResultAsync(query, cancellationToken);
+        // Apply sorting and paging on the entity query
+        var pagedQuery = dbQuery
+            .ApplySorting(query.SortBy, query.SortDescending)
+            .ApplyPaging(query.Page, query.PageSize);
+
+        // Materialize the results
+        var entities = await Task.Run(() => pagedQuery.ToList(), cancellationToken);
+
+        // Map to models in memory
+        var mappedItems = entities.Select(x => MapToGridModel(x)).ToList();
+
+        var result = new GridResult<FormTemplateManagementGridModel>
+        {
+            Data = mappedItems,
+            TotalCount = totalCount,
+            Page = query.Page,
+            PageSize = query.PageSize
+        };
 
         return Result<GridResult<FormTemplateManagementGridModel>>.Success(result);
     }

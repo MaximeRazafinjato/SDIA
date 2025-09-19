@@ -3,6 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { fr } from 'date-fns/locale';
 import { AuthProvider } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import MainLayout from '@/layouts/MainLayout';
@@ -45,34 +48,36 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <AuthProvider>
-          <Router>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/registration-access/:token" element={<RegistrationAccess />} />
-              <Route path="/registration-edit/:id" element={<RegistrationEdit />} />
-              <Route path="/registration-public/:token" element={<RegistrationPublic />} />
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="registrations-dashboard" element={<RegistrationsDashboard />} />
-                <Route path="registrations/:id" element={<RegistrationDetail />} />
-                <Route path="users" element={<Users />} />
-                <Route path="courses" element={<div>Cours - À venir</div>} />
-              </Route>
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </Router>
-        </AuthProvider>
+        <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
+          <AuthProvider>
+            <Router>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/registration-access/:token" element={<RegistrationAccess />} />
+                <Route path="/registration-edit/:id" element={<RegistrationEdit />} />
+                <Route path="/registration-public/:token" element={<RegistrationPublic />} />
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="registrations-dashboard" element={<RegistrationsDashboard />} />
+                  <Route path="registrations/:id" element={<RegistrationDetail />} />
+                  <Route path="users" element={<Users />} />
+                  <Route path="courses" element={<div>Cours - À venir</div>} />
+                </Route>
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </Router>
+          </AuthProvider>
+        </LocalizationProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
