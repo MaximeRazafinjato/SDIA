@@ -1,5 +1,7 @@
 using Ardalis.Result;
+using Microsoft.EntityFrameworkCore;
 using SDIA.Application.Common.Extensions;
+using SDIA.Application.Common.Mappings;
 using SDIA.Application.Common.Models;
 using SDIA.Core.FormTemplates;
 
@@ -18,7 +20,7 @@ public class FormTemplateManagementGridService
         FormTemplateManagementGridQuery query,
         CancellationToken cancellationToken = default)
     {
-        var dbQuery = await _formTemplateRepository.GetQueryableAsync();
+        var dbQuery = _formTemplateRepository.GetAll(cancellationToken);
 
         // Apply text search using the new extension
         dbQuery = dbQuery.ApplyTextSearch(query.SearchTerm,
@@ -38,18 +40,16 @@ public class FormTemplateManagementGridService
         }
 
         // Get total count first
-        var totalCount = await Task.Run(() => dbQuery.Count(), cancellationToken);
+        var totalCount = await dbQuery.CountAsync(cancellationToken);
 
-        // Apply sorting and paging on the entity query
-        var pagedQuery = dbQuery
+        // Apply projection, sorting and paging
+        var mappedQuery = dbQuery
+            .Select(FormTemplateMappings.ToGridModel())
             .ApplySorting(query.SortBy, query.SortDescending)
             .ApplyPaging(query.Page, query.PageSize);
 
-        // Materialize the results
-        var entities = await Task.Run(() => pagedQuery.ToList(), cancellationToken);
-
-        // Map to models in memory
-        var mappedItems = entities.Select(x => MapToGridModel(x)).ToList();
+        // Execute query with projection
+        var mappedItems = await mappedQuery.ToListAsync(cancellationToken);
 
         var result = new GridResult<FormTemplateManagementGridModel>
         {
@@ -60,23 +60,5 @@ public class FormTemplateManagementGridService
         };
 
         return Result<GridResult<FormTemplateManagementGridModel>>.Success(result);
-    }
-
-    private static FormTemplateManagementGridModel MapToGridModel(FormTemplate formTemplate)
-    {
-        return new FormTemplateManagementGridModel
-        {
-            Id = formTemplate.Id,
-            Name = formTemplate.Name,
-            Description = formTemplate.Description,
-            Version = formTemplate.Version,
-            IsActive = formTemplate.IsActive,
-            OrganizationName = null, // Organization relation is not included in the query
-            SectionsCount = 0, // Sections relation is not included in the query
-            FieldsCount = 0, // Sections relation is not included in the query
-            RegistrationsCount = 0, // Registrations relation is not included in the query
-            CreatedAt = formTemplate.CreatedAt,
-            UpdatedAt = formTemplate.UpdatedAt
-        };
     }
 }

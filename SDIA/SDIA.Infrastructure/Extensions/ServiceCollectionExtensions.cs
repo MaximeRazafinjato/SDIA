@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
         services.AddScoped<IRegistrationRepository, RegistrationRepository>();
+        services.AddScoped<IRegistrationCommentRepository, RegistrationCommentRepository>();
         services.AddScoped<IFormTemplateRepository, FormTemplateRepository>();
         services.AddScoped<IDocumentRepository, DocumentRepository>();
         

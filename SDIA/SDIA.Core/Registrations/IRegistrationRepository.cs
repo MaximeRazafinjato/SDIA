@@ -11,6 +11,7 @@ public interface IRegistrationRepository : IRepository<Registration>
     Task<IEnumerable<Registration>> GetByManagedByUserIdAsync(Guid userId);
     Task<Registration?> GetByEmailAsync(string email);
     Task<Registration?> GetByTokenAsync(string token);
+    Task<Registration?> GetByAccessTokenAsync(string accessToken, CancellationToken cancellationToken = default);
     Task<IEnumerable<Registration>> GetWithDocumentsAsync();
     Task<IEnumerable<Registration>> GetPendingRegistrationsAsync();
     Task<IEnumerable<Registration>> GetCompletedRegistrationsAsync();

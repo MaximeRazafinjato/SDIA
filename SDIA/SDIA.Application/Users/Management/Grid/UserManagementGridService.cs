@@ -1,5 +1,7 @@
 using Ardalis.Result;
+using Microsoft.EntityFrameworkCore;
 using SDIA.Application.Common.Extensions;
+using SDIA.Application.Common.Mappings;
 using SDIA.Application.Common.Models;
 using SDIA.Core.Users;
 
@@ -16,7 +18,7 @@ public class UserManagementGridService
 
     public async Task<Result<GridResult<UserManagementGridModel>>> ExecuteAsync(UserManagementGridQuery query, CancellationToken cancellationToken = default)
     {
-        var dbQuery = await _userRepository.GetQueryableAsync();
+        var dbQuery = _userRepository.GetAll(cancellationToken);
 
         // Apply text search using the new extension
         dbQuery = dbQuery.ApplyTextSearch(query.SearchTerm,
@@ -73,18 +75,16 @@ public class UserManagementGridService
         }
 
         // Get total count first
-        var totalCount = await Task.Run(() => dbQuery.Count(), cancellationToken);
+        var totalCount = await dbQuery.CountAsync(cancellationToken);
 
-        // Apply sorting and paging on the entity query
-        var pagedQuery = dbQuery
+        // Apply projection, sorting and paging
+        var mappedQuery = dbQuery
+            .Select(UserMappings.ToGridModel())
             .ApplySorting(query.SortBy, query.SortDescending)
             .ApplyPaging(query.Page, query.PageSize);
 
-        // Materialize the results
-        var entities = await Task.Run(() => pagedQuery.ToList(), cancellationToken);
-
-        // Map to models in memory
-        var mappedItems = entities.Select(x => MapToGridModel(x)).ToList();
+        // Execute query with projection
+        var mappedItems = await mappedQuery.ToListAsync(cancellationToken);
 
         var result = new GridResult<UserManagementGridModel>
         {
@@ -95,24 +95,5 @@ public class UserManagementGridService
         };
 
         return Result<GridResult<UserManagementGridModel>>.Success(result);
-    }
-
-    private static UserManagementGridModel MapToGridModel(User user)
-    {
-        return new UserManagementGridModel
-        {
-            Id = user.Id,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            Email = user.Email,
-            Phone = user.Phone,
-            Role = user.Role,
-            IsActive = user.IsActive,
-            EmailConfirmed = user.EmailConfirmed,
-            PhoneConfirmed = user.PhoneConfirmed,
-            LastLoginAt = user.LastLoginAt,
-            OrganizationName = null, // Organization relation is not included in the query
-            CreatedAt = user.CreatedAt
-        };
     }
 }

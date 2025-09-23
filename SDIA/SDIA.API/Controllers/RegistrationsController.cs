@@ -1,14 +1,22 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
-using SDIA.Infrastructure.Data;
 using SDIA.API.Models.Registrations;
 using SDIA.API.Services;
 using SDIA.Core.Registrations;
 using SDIA.SharedKernel.Enums;
 using SDIA.Application.Registrations.Management.Grid;
+using SDIA.Application.Registrations.Management.GetById;
+using SDIA.Application.Registrations.Management.Statistics;
+using SDIA.Application.Registrations.Management.GetAll;
+using SDIA.Application.Registrations.Management.Create;
+using SDIA.Application.Registrations.Management.Update;
+using SDIA.Application.Registrations.Management.UpdateStatus;
+using SDIA.Application.Registrations.Management.Action;
+using SDIA.Application.Registrations.Management.GenerateAccessLink;
+using SDIA.Application.Registrations.Management.SendReminder;
+using SDIA.Application.Registrations.Management.Validate;
+using SDIA.Application.Registrations.Management.Reject;
 using System.Security.Claims;
-using System.Security.Cryptography;
 
 namespace SDIA.API.Controllers;
 
@@ -17,18 +25,15 @@ namespace SDIA.API.Controllers;
 public class RegistrationsController : ControllerBase
 {
     private readonly ILogger<RegistrationsController> _logger;
-    private readonly SDIADbContext _context;
     private readonly INotificationLoggerService _notificationLogger;
     private readonly IConfiguration _configuration;
 
     public RegistrationsController(
         ILogger<RegistrationsController> logger,
-        SDIADbContext context,
         INotificationLoggerService notificationLogger,
         IConfiguration configuration)
     {
         _logger = logger;
-        _context = context;
         _notificationLogger = notificationLogger;
         _configuration = configuration;
     }
@@ -58,42 +63,33 @@ public class RegistrationsController : ControllerBase
     /// </summary>
     [HttpGet("stats")]
     [Authorize]
-    public async Task<IActionResult> GetStatistics()
+    public async Task<IActionResult> GetStatistics(
+        [FromServices] RegistrationManagementStatisticsService service,
+        CancellationToken cancellationToken)
     {
-        try
-        {
-            var allRegistrations = await _context.Registrations.ToListAsync();
-            var stats = allRegistrations
-                .GroupBy(r => r.Status)
-                .Select(g => new { Status = g.Key, Count = g.Count() })
-                .ToList();
+        var result = await service.ExecuteAsync(cancellationToken);
 
-            var total = stats.Sum(s => s.Count);
-            var pendingCount = stats.FirstOrDefault(s => s.Status == RegistrationStatus.Pending)?.Count ?? 0;
-            var validatedCount = stats.FirstOrDefault(s => s.Status == RegistrationStatus.Validated)?.Count ?? 0;
-            var rejectedCount = stats.FirstOrDefault(s => s.Status == RegistrationStatus.Rejected)?.Count ?? 0;
-            var draftCount = stats.FirstOrDefault(s => s.Status == RegistrationStatus.Draft)?.Count ?? 0;
-
-            return Ok(new
-            {
-                total,
-                pending = pendingCount,
-                validated = validatedCount,
-                rejected = rejectedCount,
-                byStatus = new[]
-                {
-                    new { status = "Pending", count = pendingCount },
-                    new { status = "Draft", count = draftCount },
-                    new { status = "Validated", count = validatedCount },
-                    new { status = "Rejected", count = rejectedCount }
-                }
-            });
-        }
-        catch (Exception ex)
+        if (!result.IsSuccess)
         {
-            _logger.LogError(ex, "Error getting registration statistics");
+            _logger.LogError("Error getting registration statistics: {Errors}", string.Join(", ", result.Errors));
             return StatusCode(500, new { error = "Une erreur est survenue lors de la récupération des statistiques" });
         }
+
+        var stats = result.Value;
+        return Ok(new
+        {
+            total = stats.TotalRegistrations,
+            pending = stats.PendingCount,
+            validated = stats.ValidatedCount,
+            rejected = stats.RejectedCount,
+            byStatus = new[]
+            {
+                new { status = "Pending", count = stats.PendingCount },
+                new { status = "Draft", count = stats.DraftCount },
+                new { status = "Validated", count = stats.ValidatedCount },
+                new { status = "Rejected", count = stats.RejectedCount }
+            }
+        });
     }
 
     /// <summary>
@@ -102,71 +98,38 @@ public class RegistrationsController : ControllerBase
     [HttpGet]
     [Authorize]
     public async Task<IActionResult> GetRegistrations(
-        [FromQuery] RegistrationStatus? status = null,
-        [FromQuery] string? searchTerm = null,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] RegistrationStatus? status,
+        [FromQuery] string? searchTerm,
+        [FromQuery] int page,
+        [FromQuery] int pageSize,
+        [FromServices] RegistrationManagementGetAllService service,
+        CancellationToken cancellationToken)
     {
-        try
+        var query = new RegistrationManagementGetAllQuery
         {
-            var query = _context.Registrations
-                .Include(r => r.Organization)
-                .Include(r => r.AssignedToUser)
-                .AsQueryable();
+            Status = status?.ToString(),
+            SearchTerm = searchTerm,
+            Page = page == 0 ? 1 : page,
+            PageSize = pageSize == 0 ? 20 : pageSize
+        };
 
-            if (status.HasValue)
-            {
-                query = query.Where(r => r.Status == status.Value);
-            }
+        var result = await service.ExecuteAsync(query, cancellationToken);
 
-            if (!string.IsNullOrWhiteSpace(searchTerm))
-            {
-                query = query.Where(r => 
-                    r.FirstName.Contains(searchTerm) ||
-                    r.LastName.Contains(searchTerm) ||
-                    r.Email.Contains(searchTerm) ||
-                    r.RegistrationNumber.Contains(searchTerm));
-            }
-
-            var totalCount = await query.CountAsync();
-            
-            var items = await query
-                .OrderByDescending(r => r.CreatedAt)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(r => new
-                {
-                    r.Id,
-                    r.RegistrationNumber,
-                    r.FirstName,
-                    r.LastName,
-                    r.Email,
-                    r.Phone,
-                    r.Status,
-                    r.CreatedAt,
-                    r.SubmittedAt,
-                    OrganizationName = r.Organization != null ? r.Organization.Name : null,
-                    r.IsMinor,
-                    AssignedToUserName = r.AssignedToUser != null ? $"{r.AssignedToUser.FirstName} {r.AssignedToUser.LastName}" : null
-                })
-                .ToListAsync();
-
-            var result = new
-            {
-                items,
-                totalCount,
-                page,
-                pageSize,
-                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
-            };
-
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!result.IsSuccess)
         {
-            _logger.LogError(ex, "Error getting registrations");
+            _logger.LogError("Error getting registrations: {Errors}", string.Join(", ", result.Errors));
             return StatusCode(500, new { error = "Une erreur est survenue lors de la récupération des inscriptions" });
         }
+
+        var gridResult = result.Value;
+        return Ok(new
+        {
+            items = gridResult.Data,
+            totalCount = gridResult.TotalCount,
+            page = gridResult.Page,
+            pageSize = gridResult.PageSize,
+            totalPages = (int)Math.Ceiling(gridResult.TotalCount / (double)gridResult.PageSize)
+        });
     }
 
     /// <summary>
@@ -174,29 +137,24 @@ public class RegistrationsController : ControllerBase
     /// </summary>
     [HttpGet("{id}")]
     [Authorize]
-    public async Task<IActionResult> GetRegistration(Guid id)
+    public async Task<IActionResult> GetRegistration(
+        Guid id,
+        [FromServices] RegistrationManagementGetByIdService service,
+        CancellationToken cancellationToken)
     {
-        try
-        {
-            var registration = await _context.Registrations
-                .Include(r => r.Organization)
-                .Include(r => r.AssignedToUser)
-                .Include(r => r.FormTemplate)
-                .Include(r => r.Comments)
-                .FirstOrDefaultAsync(r => r.Id == id);
+        var result = await service.ExecuteAsync(id, cancellationToken);
 
-            if (registration == null)
+        if (!result.IsSuccess)
+        {
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
             {
                 return NotFound(new { error = "Inscription non trouvée" });
             }
-
-            return Ok(registration);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting registration {RegistrationId}", id);
+            _logger.LogError("Error getting registration {RegistrationId}: {Errors}", id, string.Join(", ", result.Errors));
             return StatusCode(500, new { error = "Une erreur est survenue lors de la récupération de l'inscription" });
         }
+
+        return Ok(result.Value);
     }
 
     /// <summary>
@@ -204,48 +162,41 @@ public class RegistrationsController : ControllerBase
     /// </summary>
     [HttpPost]
     [Authorize]
-    public async Task<IActionResult> CreateRegistration([FromBody] CreateRegistrationDto dto)
+    public async Task<IActionResult> CreateRegistration(
+        [FromBody] CreateRegistrationDto dto,
+        [FromServices] RegistrationManagementCreateService service,
+        CancellationToken cancellationToken)
     {
-        try
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-            {
-                return Unauthorized();
-            }
-
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null)
-            {
-                return Unauthorized();
-            }
-
-            var registration = new Registration
-            {
-                Id = Guid.NewGuid(),
-                RegistrationNumber = $"REG-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 6).ToUpper()}",
-                FirstName = dto.FirstName,
-                LastName = dto.LastName,
-                Email = dto.Email,
-                Phone = dto.Phone,
-                Status = RegistrationStatus.Draft,
-                OrganizationId = user.OrganizationId ?? Guid.Empty,
-                FormTemplateId = dto.FormTemplateId,
-                FormData = dto.FormData,
-                BirthDate = dto.BirthDate,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Registrations.Add(registration);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetRegistration), new { id = registration.Id }, registration);
+            return Unauthorized();
         }
-        catch (Exception ex)
+
+        var model = new RegistrationManagementCreateModel
         {
-            _logger.LogError(ex, "Error creating registration");
+            FirstName = dto.FirstName,
+            LastName = dto.LastName,
+            Email = dto.Email,
+            Phone = dto.Phone,
+            FormTemplateId = dto.FormTemplateId,
+            FormData = dto.FormData,
+            BirthDate = dto.BirthDate
+        };
+
+        var result = await service.ExecuteAsync(model, userId, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.Status == Ardalis.Result.ResultStatus.Unauthorized)
+            {
+                return Unauthorized();
+            }
+            _logger.LogError("Error creating registration: {Errors}", string.Join(", ", result.Errors));
             return StatusCode(500, new { error = "Une erreur est survenue lors de la création de l'inscription" });
         }
+
+        return CreatedAtAction(nameof(GetRegistration), new { id = result.Value.Id }, result.Value);
     }
 
     /// <summary>
@@ -253,54 +204,38 @@ public class RegistrationsController : ControllerBase
     /// </summary>
     [HttpPut("{id}")]
     [Authorize]
-    public async Task<IActionResult> UpdateRegistration(Guid id, [FromBody] UpdateRegistrationDto dto)
+    public async Task<IActionResult> UpdateRegistration(
+        Guid id,
+        [FromBody] UpdateRegistrationDto dto,
+        [FromServices] RegistrationManagementUpdateService service,
+        CancellationToken cancellationToken)
     {
-        try
+        var model = new RegistrationManagementUpdateModel
         {
-            var registration = await _context.Registrations.FindAsync(id);
-            if (registration == null)
+            Id = id,
+            FirstName = dto.FirstName,
+            LastName = dto.LastName,
+            Email = dto.Email,
+            Phone = dto.Phone,
+            BirthDate = dto.BirthDate,
+            FormData = dto.FormData,
+            Status = dto.Status,
+            RejectionReason = dto.RejectionReason
+        };
+
+        var result = await service.ExecuteAsync(model, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
             {
                 return NotFound(new { error = "Inscription non trouvée" });
             }
-
-            // Update fields
-            registration.FirstName = dto.FirstName ?? registration.FirstName;
-            registration.LastName = dto.LastName ?? registration.LastName;
-            registration.Email = dto.Email ?? registration.Email;
-            registration.Phone = dto.Phone ?? registration.Phone;
-            registration.BirthDate = dto.BirthDate ?? registration.BirthDate;
-            registration.FormData = dto.FormData ?? registration.FormData;
-            registration.UpdatedAt = DateTime.UtcNow;
-
-            // Update status if provided
-            if (dto.Status.HasValue)
-            {
-                registration.Status = dto.Status.Value;
-
-                if (dto.Status == RegistrationStatus.Validated && !registration.ValidatedAt.HasValue)
-                {
-                    registration.ValidatedAt = DateTime.UtcNow;
-                }
-                else if (dto.Status == RegistrationStatus.Rejected && !registration.RejectedAt.HasValue)
-                {
-                    registration.RejectedAt = DateTime.UtcNow;
-                    registration.RejectionReason = dto.RejectionReason ?? "Dossier non conforme";
-                }
-                else if (dto.Status == RegistrationStatus.Pending && !registration.SubmittedAt.HasValue)
-                {
-                    registration.SubmittedAt = DateTime.UtcNow;
-                }
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Inscription mise à jour avec succès", registration });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating registration");
+            _logger.LogError("Error updating registration: {Errors}", string.Join(", ", result.Errors));
             return StatusCode(500, new { error = "Une erreur est survenue lors de la mise à jour de l'inscription" });
         }
+
+        return Ok(new { message = result.Value.Message, registration = result.Value });
     }
 
     /// <summary>
@@ -308,33 +243,31 @@ public class RegistrationsController : ControllerBase
     /// </summary>
     [HttpPut("{id}/status")]
     [Authorize]
-    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateStatusDto dto)
+    public async Task<IActionResult> UpdateStatus(
+        Guid id,
+        [FromBody] UpdateStatusDto dto,
+        [FromServices] RegistrationManagementUpdateStatusService service,
+        CancellationToken cancellationToken)
     {
-        try
+        var model = new RegistrationManagementUpdateStatusModel
         {
-            var registration = await _context.Registrations.FindAsync(id);
-            if (registration == null)
+            Id = id,
+            Status = dto.Status
+        };
+
+        var result = await service.ExecuteAsync(model, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
             {
                 return NotFound(new { error = "Inscription non trouvée" });
             }
-
-            registration.Status = dto.Status;
-            registration.UpdatedAt = DateTime.UtcNow;
-
-            if (dto.Status == RegistrationStatus.Pending && !registration.SubmittedAt.HasValue)
-            {
-                registration.SubmittedAt = DateTime.UtcNow;
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Statut mis à jour avec succès" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating registration status");
+            _logger.LogError("Error updating registration status: {Errors}", string.Join(", ", result.Errors));
             return StatusCode(500, new { error = "Une erreur est survenue lors de la mise à jour du statut" });
         }
+
+        return Ok(new { message = "Statut mis à jour avec succès" });
     }
 
     /// <summary>
@@ -342,43 +275,35 @@ public class RegistrationsController : ControllerBase
     /// </summary>
     [HttpPost("{id}/action")]
     [Authorize]
-    public async Task<IActionResult> PerformAction(Guid id, [FromBody] RegistrationActionDto dto)
+    public async Task<IActionResult> PerformAction(
+        Guid id,
+        [FromBody] RegistrationActionDto dto,
+        [FromServices] RegistrationManagementActionService service,
+        CancellationToken cancellationToken)
     {
-        try
+        var model = new RegistrationManagementActionModel
         {
-            var registration = await _context.Registrations.FindAsync(id);
-            if (registration == null)
+            Id = id,
+            ActionType = dto.ActionType
+        };
+
+        var result = await service.ExecuteAsync(model, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
             {
                 return NotFound(new { error = "Inscription non trouvée" });
             }
-
-            var action = dto.ActionType.ToLower();
-            switch (action)
+            if (result.Status == Ardalis.Result.ResultStatus.Invalid)
             {
-                case "validate":
-                    registration.Status = RegistrationStatus.Validated;
-                    break;
-                case "reject":
-                    registration.Status = RegistrationStatus.Rejected;
-                    break;
-                case "submit":
-                    registration.Status = RegistrationStatus.Pending;
-                    registration.SubmittedAt = DateTime.UtcNow;
-                    break;
-                default:
-                    return BadRequest(new { error = "Action non reconnue" });
+                return BadRequest(new { error = result.ValidationErrors.FirstOrDefault()?.ErrorMessage ?? "Action non reconnue" });
             }
-
-            registration.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = $"Action '{action}' effectuée avec succès" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error performing action on registration");
+            _logger.LogError("Error performing action on registration: {Errors}", string.Join(", ", result.Errors));
             return StatusCode(500, new { error = "Une erreur est survenue lors de l'exécution de l'action" });
         }
+
+        return Ok(new { message = $"Action '{dto.ActionType}' effectuée avec succès" });
     }
 
     /// <summary>
@@ -386,80 +311,73 @@ public class RegistrationsController : ControllerBase
     /// </summary>
     [HttpPost("{id}/generate-access-link")]
     [Authorize]
-    public async Task<IActionResult> GenerateAccessLink(Guid id, [FromBody] GenerateAccessLinkDto? dto)
+    public async Task<IActionResult> GenerateAccessLink(
+        Guid id,
+        [FromBody] GenerateAccessLinkDto? dto,
+        [FromServices] RegistrationManagementGenerateAccessLinkService service,
+        CancellationToken cancellationToken)
     {
-        try
-        {
-            var registration = await _context.Registrations
-                .Include(r => r.Organization)
-                .FirstOrDefaultAsync(r => r.Id == id);
+        var baseUrl = _configuration["AppSettings:FrontendUrl"] ?? "http://localhost:5173";
 
-            if (registration == null)
+        var model = new RegistrationManagementGenerateAccessLinkModel
+        {
+            RegistrationId = id,
+            BaseUrl = baseUrl,
+            SendNotification = dto?.SendNotification ?? true,
+            CustomMessage = dto?.CustomMessage
+        };
+
+        var result = await service.ExecuteAsync(model, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
             {
                 return NotFound(new { error = "Inscription non trouvée" });
             }
-
-            // Generate access token and verification code
-            var accessToken = GenerateSecureToken();
-            var verificationCode = GenerateVerificationCode();
-
-            // Update registration
-            registration.AccessToken = accessToken;
-            registration.AccessTokenExpiry = DateTime.UtcNow.AddHours(24);
-            registration.SmsVerificationCode = verificationCode;
-            registration.VerificationCodeExpiry = DateTime.UtcNow.AddMinutes(10);
-            registration.VerificationAttempts = 0;
-            registration.LastReminderSentAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            // Generate link
-            var baseUrl = _configuration["AppSettings:FrontendUrl"] ?? "http://localhost:5173";
-            var accessLink = $"{baseUrl}/registration-access/{accessToken}";
-
-            // Log notification
-            var fullName = $"{registration.FirstName} {registration.LastName}";
-            var message = dto?.CustomMessage ?? GenerateDefaultMessage(fullName, verificationCode, accessLink);
-
-            if (dto?.SendNotification ?? true)
-            {
-                if (!string.IsNullOrEmpty(registration.Phone))
-                {
-                    await _notificationLogger.LogSmsNotification(
-                        registration.Phone,
-                        fullName,
-                        verificationCode,
-                        accessLink,
-                        message
-                    );
-                }
-                else
-                {
-                    await _notificationLogger.LogEmailNotification(
-                        registration.Email,
-                        fullName,
-                        verificationCode,
-                        accessLink,
-                        message
-                    );
-                }
-            }
-
-            return Ok(new
-            {
-                success = true,
-                accessLink,
-                verificationCode,
-                expiresAt = registration.AccessTokenExpiry,
-                notificationType = !string.IsNullOrEmpty(registration.Phone) ? "SMS" : "Email",
-                recipient = !string.IsNullOrEmpty(registration.Phone) ? registration.Phone : registration.Email
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating access link");
+            _logger.LogError("Error generating access link: {Errors}", string.Join(", ", result.Errors));
             return StatusCode(500, new { error = "Une erreur est survenue lors de la génération du lien" });
         }
+
+        // Log notification if requested
+        if (model.SendNotification)
+        {
+            var message = dto?.CustomMessage ?? GenerateDefaultMessage(
+                result.Value.RegistrationName,
+                result.Value.VerificationCode,
+                result.Value.AccessLink);
+
+            if (result.Value.NotificationType == "SMS")
+            {
+                await _notificationLogger.LogSmsNotification(
+                    result.Value.Recipient,
+                    result.Value.RegistrationName,
+                    result.Value.VerificationCode,
+                    result.Value.AccessLink,
+                    message
+                );
+            }
+            else
+            {
+                await _notificationLogger.LogEmailNotification(
+                    result.Value.Recipient,
+                    result.Value.RegistrationName,
+                    result.Value.VerificationCode,
+                    result.Value.AccessLink,
+                    message
+                );
+            }
+        }
+
+        return Ok(new
+        {
+            success = result.Value.Success,
+            accessLink = result.Value.AccessLink,
+            verificationCode = result.Value.VerificationCode,
+            expiresAt = result.Value.ExpiresAt,
+            notificationType = result.Value.NotificationType,
+            recipient = result.Value.Recipient
+        });
     }
 
     /// <summary>
@@ -467,41 +385,40 @@ public class RegistrationsController : ControllerBase
     /// </summary>
     [HttpPost("{id}/send-reminder")]
     [Authorize]
-    public async Task<IActionResult> SendReminder(Guid id, [FromBody] GenerateAccessLinkDto? dto)
+    public async Task<IActionResult> SendReminder(
+        Guid id,
+        [FromBody] GenerateAccessLinkDto? dto,
+        [FromServices] RegistrationManagementSendReminderService service,
+        CancellationToken cancellationToken)
     {
-        try
+        var baseUrl = _configuration["AppSettings:FrontendUrl"] ?? "http://localhost:5173";
+
+        var model = new RegistrationManagementSendReminderModel
         {
-            var registration = await _context.Registrations.FindAsync(id);
-            if (registration == null)
+            RegistrationId = id,
+            BaseUrl = baseUrl,
+            CustomMessage = dto?.CustomMessage
+        };
+
+        var result = await service.ExecuteAsync(model, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
             {
                 return NotFound(new { error = "Inscription non trouvée" });
             }
+            _logger.LogError("Error sending reminder: {Errors}", string.Join(", ", result.Errors));
+            return StatusCode(500, new { error = "Une erreur est survenue lors de l'envoi du rappel" });
+        }
 
-            // Generate new access token for the email link
-            var token = GenerateSecureToken();
-            registration.AccessToken = token;
-            registration.AccessTokenExpiry = DateTime.UtcNow.AddDays(7);
-            registration.LastReminderSentAt = DateTime.UtcNow;
-
-            // Clear any existing verification code (will be generated when link is clicked)
-            registration.SmsVerificationCode = string.Empty;
-            registration.VerificationCodeExpiry = null;
-            registration.VerificationAttempts = 0;
-
-            await _context.SaveChangesAsync();
-
-            // Generate link
-            var baseUrl = _configuration["AppSettings:FrontendUrl"] ?? "http://localhost:5173";
-            var accessLink = $"{baseUrl}/registration-access/{token}";
-
-            // Send EMAIL only (Step 1 of workflow)
-            var fullName = $"{registration.FirstName} {registration.LastName}";
-            var emailMessage = dto?.CustomMessage ?? $@"Bonjour {fullName},
+        // Send EMAIL only (Step 1 of workflow)
+        var emailMessage = dto?.CustomMessage ?? $@"Bonjour {result.Value.RegistrationName},
 
 Vous avez une inscription en cours qui nécessite votre attention.
 
 Pour accéder à votre dossier, veuillez cliquer sur le lien suivant :
-{accessLink}
+{result.Value.AccessLink}
 
 Ce lien est valable pendant 7 jours.
 
@@ -510,43 +427,114 @@ Une fois que vous cliquerez sur le lien, un code de vérification sera envoyé p
 Cordialement,
 L'équipe SDIA";
 
-            await _notificationLogger.LogEmailNotification(
-                registration.Email,
-                fullName,
-                null, // No verification code in email
-                accessLink,
-                emailMessage
-            );
+        await _notificationLogger.LogEmailNotification(
+            result.Value.Recipient,
+            result.Value.RegistrationName,
+            null, // No verification code in email
+            result.Value.AccessLink,
+            emailMessage
+        );
 
-            return Ok(new
-            {
-                success = true,
-                message = "Email de rappel envoyé avec succès",
-                accessLink,
-                expiresAt = registration.AccessTokenExpiry,
-                notificationType = "Email",
-                recipient = registration.Email
-            });
-        }
-        catch (Exception ex)
+        return Ok(new
         {
-            _logger.LogError(ex, "Error sending reminder");
-            return StatusCode(500, new { error = "Une erreur est survenue lors de l'envoi du rappel" });
+            success = result.Value.Success,
+            message = result.Value.Message,
+            accessLink = result.Value.AccessLink,
+            expiresAt = result.Value.ExpiresAt,
+            notificationType = result.Value.NotificationType,
+            recipient = result.Value.Recipient
+        });
+    }
+
+    /// <summary>
+    /// Validate a registration
+    /// </summary>
+    [HttpPost("{id}/validate")]
+    [Authorize]
+    public async Task<IActionResult> ValidateRegistration(
+        Guid id,
+        [FromBody] ValidateRejectDto dto,
+        [FromServices] RegistrationManagementValidateService service,
+        CancellationToken cancellationToken)
+    {
+        var model = new RegistrationManagementValidateModel
+        {
+            RegistrationId = id,
+            IsApproved = true,
+            Notes = dto?.Comments
+        };
+
+        var result = await service.ExecuteAsync(model, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
+            {
+                return NotFound(new { error = "Inscription non trouvée" });
+            }
+            _logger.LogError("Error validating registration: {Errors}", string.Join(", ", result.Errors));
+            return StatusCode(500, new { error = "Une erreur est survenue" });
         }
+
+        return Ok(new { success = true, message = "Inscription validée avec succès" });
     }
 
-    private string GenerateSecureToken()
+    /// <summary>
+    /// Reject a registration
+    /// </summary>
+    [HttpPost("{id}/reject")]
+    [Authorize]
+    public async Task<IActionResult> RejectRegistration(
+        Guid id,
+        [FromBody] ValidateRejectDto dto,
+        [FromServices] RegistrationManagementRejectService service,
+        CancellationToken cancellationToken)
     {
-        using var rng = RandomNumberGenerator.Create();
-        var bytes = new byte[32];
-        rng.GetBytes(bytes);
-        return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized();
+        }
+
+        var model = new RegistrationManagementRejectModel
+        {
+            RegistrationId = id,
+            Reason = dto?.Reason ?? string.Empty,
+            Comments = dto?.Comments
+        };
+
+        var result = await service.ExecuteAsync(model, userId, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
+            {
+                return NotFound(new { error = "Inscription non trouvée" });
+            }
+            if (result.Status == Ardalis.Result.ResultStatus.Invalid)
+            {
+                return BadRequest(new { error = result.ValidationErrors.FirstOrDefault()?.ErrorMessage ?? "La raison du rejet est obligatoire" });
+            }
+            _logger.LogError("Error rejecting registration: {Errors}", string.Join(", ", result.Errors));
+            return StatusCode(500, new { error = "Une erreur est survenue" });
+        }
+
+        return Ok(new { success = true, message = "Inscription rejetée" });
     }
 
-    private string GenerateVerificationCode()
+    /// <summary>
+    /// Send reminder to complete registration (alias for send-reminder)
+    /// </summary>
+    [HttpPost("{id}/remind")]
+    [Authorize]
+    public async Task<IActionResult> Remind(
+        Guid id,
+        [FromBody] GenerateAccessLinkDto? dto,
+        [FromServices] RegistrationManagementSendReminderService service,
+        CancellationToken cancellationToken)
     {
-        var random = new Random();
-        return random.Next(100000, 999999).ToString();
+        // Simply call the existing SendReminder method logic
+        return await SendReminder(id, dto, service, cancellationToken);
     }
 
     private string GenerateDefaultMessage(string name, string code, string link)
@@ -564,131 +552,6 @@ Ce lien est valable 24 heures et le code expire dans 10 minutes.
 
 Cordialement,
 L'équipe SDIA";
-    }
-
-    private string GenerateReminderMessage(string name, string code, string link)
-    {
-        return $@"Bonjour {name},
-
-Rappel : Votre dossier d'inscription est en attente de complétion.
-
-Votre nouveau code de vérification est : {code}
-
-Cliquez sur le lien suivant pour accéder à votre dossier :
-{link}
-
-Ce code expire dans 10 minutes.
-
-Cordialement,
-L'équipe SDIA";
-    }
-
-    /// <summary>
-    /// Validate a registration
-    /// </summary>
-    [HttpPost("{id}/validate")]
-    [Authorize]
-    public async Task<IActionResult> ValidateRegistration(Guid id, [FromBody] ValidateRejectDto dto)
-    {
-        try
-        {
-            var registration = await _context.Registrations.FindAsync(id);
-            if (registration == null)
-            {
-                return NotFound(new { error = "Inscription non trouvée" });
-            }
-
-            registration.Status = RegistrationStatus.Validated;
-            registration.ValidatedAt = DateTime.UtcNow;
-            registration.UpdatedAt = DateTime.UtcNow;
-
-            // Add comment if provided
-            if (!string.IsNullOrEmpty(dto?.Comments))
-            {
-                var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                var user = await _context.Users.FindAsync(Guid.Parse(userId!));
-
-                var comment = new RegistrationComment
-                {
-                    Id = Guid.NewGuid(),
-                    Content = dto.Comments,
-                    RegistrationId = id,
-                    AuthorId = Guid.Parse(userId!),
-                    IsInternal = true,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                _context.RegistrationComments.Add(comment);
-            }
-
-            await _context.SaveChangesAsync();
-            return Ok(new { success = true, message = "Inscription validée avec succès" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error validating registration");
-            return StatusCode(500, new { error = "Une erreur est survenue" });
-        }
-    }
-
-    /// <summary>
-    /// Reject a registration
-    /// </summary>
-    [HttpPost("{id}/reject")]
-    [Authorize]
-    public async Task<IActionResult> RejectRegistration(Guid id, [FromBody] ValidateRejectDto dto)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(dto?.Reason))
-            {
-                return BadRequest(new { error = "La raison du rejet est obligatoire" });
-            }
-
-            var registration = await _context.Registrations.FindAsync(id);
-            if (registration == null)
-            {
-                return NotFound(new { error = "Inscription non trouvée" });
-            }
-
-            registration.Status = RegistrationStatus.Rejected;
-            registration.RejectedAt = DateTime.UtcNow;
-            registration.RejectionReason = dto.Reason;
-            registration.UpdatedAt = DateTime.UtcNow;
-
-            // Add rejection reason as comment
-            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            var comment = new RegistrationComment
-            {
-                Id = Guid.NewGuid(),
-                Content = $"Dossier rejeté : {dto.Reason}",
-                RegistrationId = id,
-                AuthorId = Guid.Parse(userId!),
-                IsInternal = false, // Visible to applicant
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.RegistrationComments.Add(comment);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { success = true, message = "Inscription rejetée" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error rejecting registration");
-            return StatusCode(500, new { error = "Une erreur est survenue" });
-        }
-    }
-
-    /// <summary>
-    /// Send reminder to complete registration (alias for send-reminder)
-    /// </summary>
-    [HttpPost("{id}/remind")]
-    [Authorize]
-    public async Task<IActionResult> Remind(Guid id, [FromBody] GenerateAccessLinkDto? dto)
-    {
-        // Simply call the existing SendReminder method
-        return await SendReminder(id, dto);
     }
 }
 

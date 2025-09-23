@@ -104,6 +104,7 @@ public class FormTemplateManagementUpsertService
 
         var result = new FormTemplateManagementUpsertResult
         {
+            Id = formTemplate.Id,
             FormTemplateId = formTemplate.Id,
             IsCreated = isCreated,
             Message = isCreated ? "Form template created successfully" : "Form template updated successfully"

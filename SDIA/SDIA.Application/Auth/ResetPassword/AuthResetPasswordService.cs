@@ -1,4 +1,5 @@
 using Ardalis.Result;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SDIA.Core.Users;
 
@@ -20,24 +21,25 @@ public class AuthResetPasswordService
         _logger = logger;
     }
 
-    public async Task<Result> ExecuteAsync(AuthResetPasswordModel model, CancellationToken cancellationToken = default)
+    public async Task<Result<AuthResetPasswordResult>> ExecuteAsync(AuthResetPasswordModel model, CancellationToken cancellationToken = default)
     {
         var validationResult = await _validator.ValidateAsync(model, cancellationToken);
         if (!validationResult.IsSuccess)
         {
-            return validationResult;
+            return Result<AuthResetPasswordResult>.Invalid(validationResult.ValidationErrors);
         }
 
-        var user = await _userRepository.FindSingleAsync(u => u.PasswordResetToken == model.Token, cancellationToken);
+        var user = await _userRepository.GetAll(cancellationToken)
+            .FirstOrDefaultAsync(u => u.PasswordResetToken == model.Token, cancellationToken);
 
         if (user == null)
         {
-            return Result.Error("Invalid or expired reset token");
+            return Result<AuthResetPasswordResult>.Error("Invalid or expired reset token");
         }
 
         if (user.PasswordResetExpiry < DateTime.UtcNow)
         {
-            return Result.Error("Reset token has expired");
+            return Result<AuthResetPasswordResult>.Error("Reset token has expired");
         }
 
         // Set new password
@@ -49,6 +51,12 @@ public class AuthResetPasswordService
 
         _logger.LogInformation("Password reset successful for user: {Email}", user.Email);
 
-        return Result.Success();
+        var result = new AuthResetPasswordResult
+        {
+            Email = user.Email,
+            Success = true
+        };
+
+        return Result<AuthResetPasswordResult>.Success(result);
     }
 }

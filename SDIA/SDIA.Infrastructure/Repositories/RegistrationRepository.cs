@@ -85,6 +85,18 @@ public class RegistrationRepository : BaseRepository<Registration>, IRegistratio
             .FirstOrDefaultAsync();
     }
 
+    public async Task<Registration?> GetByAccessTokenAsync(string accessToken, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(r => r.AccessToken == accessToken)
+            .Include(r => r.Organization)
+            .Include(r => r.FormTemplate)
+            .Include(r => r.Comments!)
+                .ThenInclude(c => c.Author)
+            .Include(r => r.Documents)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<Registration>> GetWithDocumentsAsync()
     {
         return await _dbSet

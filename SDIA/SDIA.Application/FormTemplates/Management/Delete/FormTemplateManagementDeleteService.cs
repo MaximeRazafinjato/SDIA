@@ -1,4 +1,5 @@
 using Ardalis.Result;
+using Microsoft.EntityFrameworkCore;
 using SDIA.Core.FormTemplates;
 
 namespace SDIA.Application.FormTemplates.Management.Delete;
@@ -14,21 +15,28 @@ public class FormTemplateManagementDeleteService
 
     public async Task<Result> ExecuteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var formTemplate = await _formTemplateRepository.GetByIdAsync(id, cancellationToken);
+        var template = await _formTemplateRepository.GetAll(cancellationToken)
+            .Include(ft => ft.Registrations)
+            .FirstOrDefaultAsync(ft => ft.Id == id, cancellationToken);
 
-        if (formTemplate == null)
+        if (template == null)
         {
-            return Result.NotFound("Form template not found");
+            return Result.NotFound("Modèle de formulaire non trouvé");
         }
 
-        // Check if template has registrations
-        var registrationCount = await _formTemplateRepository.GetRegistrationCountAsync(id);
-        if (registrationCount > 0)
+        if (template.Registrations.Any())
         {
-            return Result.Error("Cannot delete form template with existing registrations");
+            return Result.Invalid(new List<ValidationError>
+            {
+                new ValidationError
+                {
+                    Identifier = "FormTemplate",
+                    ErrorMessage = "Impossible de supprimer un modèle utilisé par des inscriptions"
+                }
+            });
         }
 
-        await _formTemplateRepository.DeleteAsync(formTemplate, cancellationToken);
+        await _formTemplateRepository.DeleteAsync(template, cancellationToken);
 
         return Result.Success();
     }

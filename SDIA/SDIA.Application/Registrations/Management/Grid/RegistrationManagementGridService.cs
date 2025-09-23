@@ -1,5 +1,7 @@
 using Ardalis.Result;
+using Microsoft.EntityFrameworkCore;
 using SDIA.Application.Common.Extensions;
+using SDIA.Application.Common.Mappings;
 using SDIA.Application.Common.Models;
 using SDIA.Core.Registrations;
 
@@ -16,7 +18,7 @@ public class RegistrationManagementGridService
 
     public async Task<Result<GridResult<RegistrationManagementGridModel>>> ExecuteAsync(RegistrationManagementGridQuery query, CancellationToken cancellationToken = default)
     {
-        var dbQuery = await _registrationRepository.GetQueryableAsync();
+        var dbQuery = _registrationRepository.GetAll(cancellationToken);
 
         // Apply text search using the new extension
         dbQuery = dbQuery.ApplyTextSearch(query.SearchTerm,
@@ -122,18 +124,16 @@ public class RegistrationManagementGridService
         }
 
         // Get total count first
-        var totalCount = await Task.Run(() => dbQuery.Count(), cancellationToken);
+        var totalCount = await dbQuery.CountAsync(cancellationToken);
 
-        // Apply sorting and paging on the entity query
-        var pagedQuery = dbQuery
+        // Apply projection, sorting and paging
+        var mappedQuery = dbQuery
+            .Select(RegistrationMappings.ToGridModel())
             .ApplySorting(query.SortBy, query.SortDescending)
             .ApplyPaging(query.Page, query.PageSize);
 
-        // Materialize the results
-        var entities = await Task.Run(() => pagedQuery.ToList(), cancellationToken);
-
-        // Map to models in memory
-        var mappedItems = entities.Select(x => MapToGridModel(x)).ToList();
+        // Execute query with projection
+        var mappedItems = await mappedQuery.ToListAsync(cancellationToken);
 
         var result = new GridResult<RegistrationManagementGridModel>
         {
@@ -144,28 +144,5 @@ public class RegistrationManagementGridService
         };
 
         return Result<GridResult<RegistrationManagementGridModel>>.Success(result);
-    }
-
-    private static RegistrationManagementGridModel MapToGridModel(Registration registration)
-    {
-        return new RegistrationManagementGridModel
-        {
-            Id = registration.Id,
-            RegistrationNumber = registration.RegistrationNumber,
-            Status = registration.Status,
-            FirstName = registration.FirstName,
-            LastName = registration.LastName,
-            Email = registration.Email,
-            Phone = registration.Phone,
-            BirthDate = registration.BirthDate,
-            IsMinor = registration.IsMinor,
-            SubmittedAt = registration.SubmittedAt,
-            EmailVerified = registration.EmailVerified,
-            PhoneVerified = registration.PhoneVerified,
-            OrganizationName = null, // Organization relation is not included in the query
-            FormTemplateName = null, // FormTemplate relation is not included in the query
-            AssignedToUserName = null, // AssignedToUser relation is not included in the query
-            CreatedAt = registration.CreatedAt
-        };
     }
 }

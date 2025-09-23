@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
-using SDIA.Infrastructure.Data;
 using SDIA.API.Models.Users;
 using SDIA.Application.Users.Management.GetById;
 using SDIA.Application.Users.Management.Grid;
 using SDIA.Application.Users.Management.Upsert;
 using SDIA.Application.Users.Management.Delete;
-using SDIA.Core.Users;
+using SDIA.Application.Users.Management.ResendValidation;
+using SDIA.Application.Users.Management.ResetPassword;
+using SDIA.Application.Users.Management.Statistics;
 using System.Security.Claims;
 using SimpleUser = SDIA.Core.Users.User;
 
@@ -18,13 +18,11 @@ namespace SDIA.API.Controllers;
 [Authorize]
 public class UsersController : ControllerBase
 {
-    private readonly SDIADbContext _context;
     private readonly ILogger<UsersController> _logger;
     private readonly IConfiguration _configuration;
 
-    public UsersController(SDIADbContext context, ILogger<UsersController> logger, IConfiguration configuration)
+    public UsersController(ILogger<UsersController> logger, IConfiguration configuration)
     {
-        _context = context;
         _logger = logger;
         _configuration = configuration;
     }
@@ -140,111 +138,76 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost("{id}/resend-validation")]
-    public async Task<IActionResult> ResendValidationEmail(Guid id)
+    public async Task<IActionResult> ResendValidationEmail(
+        Guid id,
+        [FromServices] UserManagementResendValidationService service,
+        CancellationToken cancellationToken)
     {
-        try
+        var result = await service.ExecuteAsync(id, cancellationToken);
+
+        if (!result.IsSuccess)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
-            if (user == null)
-            {
-                return NotFound(new { message = "User not found" });
-            }
-
-            if (user.EmailConfirmed)
-            {
-                return BadRequest(new { message = "Email already confirmed" });
-            }
-
-            // Generate new verification token
-            user.EmailVerificationToken = Guid.NewGuid().ToString();
-
-            // Generate new temporary password
-            var tempPassword = GenerateTemporaryPassword();
-            user.SetPassword(tempPassword);
-
-            await _context.SaveChangesAsync();
-
-            // Resend validation email
-            await SendValidationEmail(user, tempPassword);
-
-            _logger.LogInformation("Validation email resent to {Email}", user.Email);
-
-            return Ok(new { message = "Validation email sent successfully" });
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
+                return NotFound(new { message = result.Errors.FirstOrDefault() });
+            if (result.Status == Ardalis.Result.ResultStatus.Invalid)
+                return BadRequest(new { message = result.ValidationErrors.FirstOrDefault()?.ErrorMessage });
+            return BadRequest(result.Errors);
         }
-        catch (Exception ex)
+
+        // Send the validation email
+        var user = new SimpleUser
         {
-            _logger.LogError(ex, "Error resending validation email for user {Id}", id);
-            return StatusCode(500, new { message = "An error occurred while sending the validation email" });
-        }
+            Email = result.Value.Email,
+            EmailVerificationToken = result.Value.ValidationToken
+        };
+        await SendValidationEmail(user, result.Value.TemporaryPassword);
+
+        _logger.LogInformation("Validation email resent to {Email}", result.Value.Email);
+        return Ok(new { message = result.Value.Message });
     }
 
     [HttpPost("{id}/reset-password")]
-    public async Task<IActionResult> ResetPassword(Guid id)
+    public async Task<IActionResult> ResetPassword(
+        Guid id,
+        [FromServices] UserManagementResetPasswordService service,
+        CancellationToken cancellationToken)
     {
-        try
+        var result = await service.ExecuteAsync(new UserManagementResetPasswordModel { UserId = id }, cancellationToken);
+
+        if (!result.IsSuccess)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
-            if (user == null)
-            {
-                return NotFound(new { message = "User not found" });
-            }
-
-            // Generate new temporary password
-            var tempPassword = GenerateTemporaryPassword();
-            user.SetPassword(tempPassword);
-            user.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            // Send password reset email
-            await SendPasswordResetEmail(user, tempPassword);
-
-            _logger.LogInformation("Password reset for user {Email}", user.Email);
-
-            return Ok(new { message = "Password reset successfully. Email sent with new password." });
+            if (result.Status == Ardalis.Result.ResultStatus.NotFound)
+                return NotFound(new { message = result.Errors.FirstOrDefault() });
+            return BadRequest(result.Errors);
         }
-        catch (Exception ex)
+
+        // Send password reset email
+        var user = new SimpleUser
         {
-            _logger.LogError(ex, "Error resetting password for user {Id}", id);
-            return StatusCode(500, new { message = "An error occurred while resetting the password" });
-        }
+            Email = result.Value.Email,
+            FirstName = result.Value.FirstName,
+            LastName = result.Value.LastName
+        };
+        await SendPasswordResetEmail(user, result.Value.TemporaryPassword);
+
+        _logger.LogInformation("Password reset for user {Email}", result.Value.Email);
+        return Ok(new { message = "Password reset successfully. Email sent with new password." });
     }
 
     [HttpGet("stats")]
-    public async Task<IActionResult> GetUserStats()
+    public async Task<IActionResult> GetUserStats(
+        [FromServices] UserManagementStatisticsService service,
+        CancellationToken cancellationToken)
     {
-        try
-        {
-            var stats = new
-            {
-                totalUsers = await _context.Users.CountAsync(u => !u.IsDeleted),
-                activeUsers = await _context.Users.CountAsync(u => !u.IsDeleted && u.IsActive),
-                inactiveUsers = await _context.Users.CountAsync(u => !u.IsDeleted && !u.IsActive),
-                confirmedEmails = await _context.Users.CountAsync(u => !u.IsDeleted && u.EmailConfirmed),
-                unconfirmedEmails = await _context.Users.CountAsync(u => !u.IsDeleted && !u.EmailConfirmed),
-                byRole = await _context.Users
-                    .Where(u => !u.IsDeleted)
-                    .GroupBy(u => u.Role)
-                    .Select(g => new { role = g.Key, count = g.Count() })
-                    .ToListAsync()
-            };
+        var result = await service.ExecuteAsync(new UserManagementStatisticsModel(), cancellationToken);
 
-            return Ok(stats);
-        }
-        catch (Exception ex)
+        if (!result.IsSuccess)
         {
-            _logger.LogError(ex, "Error getting user stats");
+            _logger.LogError("Error getting user stats: {Errors}", string.Join(", ", result.Errors));
             return StatusCode(500, new { message = "An error occurred" });
         }
-    }
 
-    private string GenerateTemporaryPassword()
-    {
-        const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%";
-        var random = new Random();
-        var password = new string(Enumerable.Repeat(chars, 12)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
-        return password;
+        return Ok(result.Value);
     }
 
     private async Task SendValidationEmail(SimpleUser user, string tempPassword)

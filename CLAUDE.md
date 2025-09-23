@@ -72,19 +72,54 @@ pnpm run format
 SDIA.Application/
 ├── _Abstractions/     # IValidator interface
 ├── _Extensions/       # ValidationExtensions with common validation helpers
+├── Auth/
+│   ├── ForgotPassword/    # AuthForgotPasswordService, AuthForgotPasswordValidator, AuthForgotPasswordModel
+│   ├── Login/             # AuthLoginService, AuthLoginValidator, AuthLoginModel
+│   ├── Register/          # AuthRegisterService, AuthRegisterValidator, AuthRegisterModel
+│   ├── ResetPassword/     # AuthResetPasswordService, AuthResetPasswordValidator, AuthResetPasswordModel
+│   └── ValidateResetToken/ # AuthValidateResetTokenService, AuthValidateResetTokenModel
+├── PublicAccess/
+│   ├── CheckStatus/       # PublicAccessCheckStatusService, PublicAccessCheckStatusModel
+│   ├── ResendVerification/ # PublicAccessResendVerificationService, PublicAccessResendVerificationModel
+│   ├── VerifyEmail/       # PublicAccessVerifyEmailService, PublicAccessVerifyEmailModel
+│   └── VerifyPhone/       # PublicAccessVerifyPhoneService, PublicAccessVerifyPhoneModel
 ├── Users/
 │   ├── Management/
-│   │   ├── Delete/    # UserManagementDeleteService
-│   │   ├── GetById/   # UserManagementGetByIdService, UserManagementGetByIdModel
-│   │   ├── Grid/      # UserManagementGridService, UserManagementGridModel, UserManagementGridQuery
-│   │   └── Upsert/    # UserManagementUpsertService, UserManagementUpsertValidator, UserManagementUpsertModel
+│   │   ├── Delete/        # UserManagementDeleteService
+│   │   ├── Export/        # UserManagementExportService, UserManagementExportModel
+│   │   ├── GetById/       # UserManagementGetByIdService, UserManagementGetByIdModel
+│   │   ├── Grid/          # UserManagementGridService, UserManagementGridModel, UserManagementGridQuery
+│   │   ├── ResetPassword/ # UserManagementResetPasswordService, UserManagementResetPasswordModel
+│   │   ├── Statistics/    # UserManagementStatisticsService, UserManagementStatisticsModel
+│   │   ├── ToggleStatus/  # UserManagementToggleStatusService, UserManagementToggleStatusModel
+│   │   └── Upsert/        # UserManagementUpsertService, UserManagementUpsertValidator, UserManagementUpsertModel
 │   └── Me/
-│       ├── Get/       # UserMeGetService, UserMeGetModel
+│       ├── Get/           # UserMeGetService, UserMeGetModel
 │       └── UpdateLanguage/ # UserMeUpdateLanguageService, UserMeUpdateLanguageModel
 ├── Registrations/
-│   └── Management/    # Similar structure as Users
+│   ├── Management/
+│   │   ├── AddComment/    # RegistrationManagementAddCommentService, RegistrationManagementAddCommentValidator, RegistrationManagementAddCommentModel
+│   │   ├── Assign/        # RegistrationManagementAssignService, RegistrationManagementAssignValidator, RegistrationManagementAssignModel
+│   │   ├── Delete/        # RegistrationManagementDeleteService
+│   │   ├── GetAll/        # RegistrationManagementGetAllService, RegistrationManagementGetAllModel, RegistrationManagementGetAllQuery
+│   │   ├── GetById/       # RegistrationManagementGetByIdService, RegistrationManagementGetByIdModel
+│   │   ├── Grid/          # RegistrationManagementGridService, RegistrationManagementGridModel, RegistrationManagementGridQuery
+│   │   ├── Search/        # RegistrationManagementSearchService, RegistrationManagementSearchModel
+│   │   ├── SendVerification/ # RegistrationManagementSendVerificationService, RegistrationManagementSendVerificationModel
+│   │   ├── Submit/        # RegistrationManagementSubmitService, RegistrationManagementSubmitModel
+│   │   ├── Upsert/        # RegistrationManagementUpsertService, RegistrationManagementUpsertValidator, RegistrationManagementUpsertModel
+│   │   └── Validate/      # RegistrationManagementValidateService, RegistrationManagementValidateValidator, RegistrationManagementValidateModel
+│   └── Public/
+│       ├── GetByIdentifier/ # RegistrationPublicGetByIdentifierService, RegistrationPublicGetByIdentifierModel
+│       ├── Submit/        # RegistrationPublicSubmitService, RegistrationPublicSubmitValidator, RegistrationPublicSubmitModel
+│       └── VerifyCode/    # RegistrationPublicVerifyCodeService, RegistrationPublicVerifyCodeValidator, RegistrationPublicVerifyCodeModel
 └── FormTemplates/
-    └── Management/    # Similar structure as Users
+    └── Management/
+        ├── Delete/        # FormTemplateManagementDeleteService
+        ├── GetAll/        # FormTemplateManagementGetAllService, FormTemplateManagementGetAllModel, FormTemplateManagementGetAllQuery
+        ├── GetById/       # FormTemplateManagementGetByIdService, FormTemplateManagementGetByIdModel
+        ├── Grid/          # FormTemplateManagementGridService, FormTemplateManagementGridModel, FormTemplateManagementGridQuery
+        └── Upsert/        # FormTemplateManagementUpsertService, FormTemplateManagementUpsertValidator, FormTemplateManagementUpsertModel
 ```
 
 ### Frontend Structure
@@ -135,6 +170,9 @@ Key endpoints:
 -   **NO MediatR** - Use services directly with dependency injection
 -   **NO FluentValidation** - Use separate Validator classes with manual validation
 -   **NO AutoMapper** - Use manual mapping methods
+-   **Services Pattern** - One service per operation for maximum separation of concerns
+-   **[FromServices] Attribute** - Controllers use services via method injection, not constructor injection
+-   **Auto-registration** - Services are automatically registered via convention-based DI
 
 ## Services Usage Examples
 

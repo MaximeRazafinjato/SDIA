@@ -21,19 +21,6 @@ public class BaseRepository<T> : IRepository<T> where T : class, IEntity
         return await _dbSet.FindAsync(new object[] { id }, cancellationToken);
     }
 
-    public virtual async Task<IEnumerable<T>> GetAllAsync(CancellationToken cancellationToken = default)
-    {
-        return await _dbSet.ToListAsync(cancellationToken);
-    }
-
-    public virtual async Task<IEnumerable<T>> GetAllAsync(int page, int pageSize, CancellationToken cancellationToken = default)
-    {
-        return await _dbSet
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-    }
-
     public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)
     {
         var result = await _dbSet.AddAsync(entity, cancellationToken);
@@ -66,36 +53,6 @@ public class BaseRepository<T> : IRepository<T> where T : class, IEntity
         await UpdateAsync(entity, cancellationToken);
     }
 
-    public virtual async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-    {
-        return await _dbSet.Where(predicate).ToListAsync(cancellationToken);
-    }
-
-    public virtual async Task<T?> FindSingleAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-    {
-        return await _dbSet.FirstOrDefaultAsync(predicate, cancellationToken);
-    }
-
-    public virtual async Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        return await _dbSet.AnyAsync(e => e.Id == id, cancellationToken);
-    }
-
-    public virtual async Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-    {
-        return await _dbSet.AnyAsync(predicate, cancellationToken);
-    }
-
-    public virtual async Task<int> CountAsync(CancellationToken cancellationToken = default)
-    {
-        return await _dbSet.CountAsync(cancellationToken);
-    }
-
-    public virtual async Task<int> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-    {
-        return await _dbSet.CountAsync(predicate, cancellationToken);
-    }
-
     public virtual async Task<IEnumerable<T>> AddRangeAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default)
     {
         await _dbSet.AddRangeAsync(entities, cancellationToken);
@@ -123,39 +80,9 @@ public class BaseRepository<T> : IRepository<T> where T : class, IEntity
         await UpdateRangeAsync(entities, cancellationToken);
     }
 
-    public virtual async Task<IEnumerable<T>> GetWithIncludeAsync(params Expression<Func<T, object>>[] includes)
+    public virtual IQueryable<T> GetAll(CancellationToken cancellationToken = default)
     {
-        IQueryable<T> query = _dbSet;
-        foreach (var include in includes)
-        {
-            query = query.Include(include);
-        }
-        return await query.ToListAsync();
-    }
-
-    public virtual async Task<IQueryable<T>> GetQueryableAsync(CancellationToken cancellationToken = default)
-    {
-        return await Task.FromResult(_dbSet.AsQueryable());
-    }
-
-    public virtual async Task<IEnumerable<T>> GetWithIncludeAsync(CancellationToken cancellationToken, params Expression<Func<T, object>>[] includes)
-    {
-        IQueryable<T> query = _dbSet;
-        foreach (var include in includes)
-        {
-            query = query.Include(include);
-        }
-        return await query.ToListAsync(cancellationToken);
-    }
-
-    public virtual async Task<T?> GetByIdWithIncludeAsync(Guid id, params Expression<Func<T, object>>[] includes)
-    {
-        IQueryable<T> query = _dbSet;
-        foreach (var include in includes)
-        {
-            query = query.Include(include);
-        }
-        return await query.FirstOrDefaultAsync(e => e.Id == id);
+        return _dbSet.AsQueryable();
     }
 
     public virtual async Task<T?> GetByIdWithIncludeAsync(Guid id, CancellationToken cancellationToken, params Expression<Func<T, object>>[] includes)

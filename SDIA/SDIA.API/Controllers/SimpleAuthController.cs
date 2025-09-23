@@ -1,13 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using SDIA.Core.Users;
 using SDIA.API.Models.Auth;
-using SDIA.Infrastructure.Data;
 using SDIA.Core.Services;
-using System.Security.Cryptography;
+using SDIA.Application.Auth.Login;
+using SDIA.Application.Auth.GetCurrentUser;
+using SDIA.Application.Auth.Register;
+using SDIA.Application.Auth.ForgotPassword;
+using SDIA.Application.Auth.ResetPassword;
+using SDIA.Application.Auth.ValidateResetToken;
 
 namespace SDIA.API.Controllers;
 
@@ -15,50 +17,49 @@ namespace SDIA.API.Controllers;
 [Route("api/auth")]
 public class SimpleAuthController : ControllerBase
 {
-    private readonly SDIADbContext _dbContext;
     private readonly ILogger<SimpleAuthController> _logger;
     private readonly IEmailService _emailService;
 
     public SimpleAuthController(
-        SDIADbContext dbContext, 
         ILogger<SimpleAuthController> logger,
         IEmailService emailService)
     {
-        _dbContext = dbContext;
         _logger = logger;
         _emailService = emailService;
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login(
+        [FromBody] LoginRequest request,
+        [FromServices] AuthLoginService service,
+        CancellationToken cancellationToken)
     {
         try
         {
-            if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Password))
+            var model = new AuthLoginModel
             {
-                return BadRequest(new { message = "Email and password are required" });
-            }
+                Email = request.Email,
+                Password = request.Password
+            };
 
-            var user = await _dbContext.Users
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
+            var result = await service.ExecuteAsync(model, cancellationToken);
 
-            if (user == null || !user.VerifyPassword(request.Password))
+            if (!result.IsSuccess)
             {
-                return Unauthorized(new { message = "Invalid email or password" });
-            }
-
-            if (!user.IsActive)
-            {
-                return Unauthorized(new { message = "Account is deactivated" });
+                if (result.Status == Ardalis.Result.ResultStatus.Invalid)
+                    return BadRequest(new { message = result.ValidationErrors.FirstOrDefault()?.ErrorMessage });
+                if (result.Status == Ardalis.Result.ResultStatus.Unauthorized)
+                    return Unauthorized(new { message = "Invalid email or password" });
+                return BadRequest(new { message = result.Errors.FirstOrDefault() });
             }
 
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Name, $"{user.FirstName} {user.LastName}"),
-                new Claim(ClaimTypes.Role, user.Role),
-                new Claim("OrganizationId", user.OrganizationId?.ToString() ?? "")
+                new Claim(ClaimTypes.NameIdentifier, result.Value.Id.ToString()),
+                new Claim(ClaimTypes.Email, result.Value.Email),
+                new Claim(ClaimTypes.Name, $"{result.Value.FirstName} {result.Value.LastName}"),
+                new Claim(ClaimTypes.Role, result.Value.Role),
+                new Claim("OrganizationId", result.Value.OrganizationId?.ToString() ?? "")
             };
 
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -66,20 +67,16 @@ public class SimpleAuthController : ControllerBase
 
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
-            // Update last login time
-            user.LastLoginAt = DateTime.UtcNow;
-            await _dbContext.SaveChangesAsync();
-
-            _logger.LogInformation("User {Email} logged in successfully", user.Email);
+            _logger.LogInformation("User {Email} logged in successfully", result.Value.Email);
 
             return Ok(new LoginResponse
             {
-                Id = user.Id,
-                Email = user.Email,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Role = user.Role,
-                OrganizationId = user.OrganizationId
+                Id = result.Value.Id,
+                Email = result.Value.Email,
+                FirstName = result.Value.FirstName,
+                LastName = result.Value.LastName,
+                Role = result.Value.Role,
+                OrganizationId = result.Value.OrganizationId
             });
         }
         catch (Exception ex)
@@ -105,7 +102,9 @@ public class SimpleAuthController : ControllerBase
     }
 
     [HttpGet("me")]
-    public async Task<IActionResult> GetCurrentUser()
+    public async Task<IActionResult> GetCurrentUser(
+        [FromServices] AuthGetCurrentUserService service,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -120,23 +119,26 @@ public class SimpleAuthController : ControllerBase
                 return Unauthorized();
             }
 
-            var user = await _dbContext.Users.FindAsync(userId);
-            if (user == null)
+            var result = await service.ExecuteAsync(userId, cancellationToken);
+
+            if (!result.IsSuccess)
             {
-                return NotFound();
+                if (result.Status == Ardalis.Result.ResultStatus.NotFound)
+                    return NotFound();
+                return BadRequest(new { message = result.Errors.FirstOrDefault() });
             }
 
             return Ok(new UserResponse
             {
-                Id = user.Id,
-                Email = user.Email,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Phone = user.Phone,
-                Role = user.Role,
-                OrganizationId = user.OrganizationId,
-                EmailConfirmed = user.EmailConfirmed,
-                PhoneConfirmed = user.PhoneConfirmed
+                Id = result.Value.Id,
+                Email = result.Value.Email,
+                FirstName = result.Value.FirstName,
+                LastName = result.Value.LastName,
+                Phone = result.Value.Phone,
+                Role = result.Value.Role,
+                OrganizationId = result.Value.OrganizationId,
+                EmailConfirmed = result.Value.EmailConfirmed,
+                PhoneConfirmed = result.Value.PhoneConfirmed
             });
         }
         catch (Exception ex)
@@ -147,50 +149,37 @@ public class SimpleAuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    public async Task<IActionResult> Register(
+        [FromBody] RegisterRequest request,
+        [FromServices] AuthRegisterService service,
+        CancellationToken cancellationToken)
     {
         try
         {
-            if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Password))
+            var model = new AuthRegisterModel
             {
-                return BadRequest(new { message = "Email and password are required" });
-            }
-
-            if (string.IsNullOrEmpty(request.FirstName) || string.IsNullOrEmpty(request.LastName))
-            {
-                return BadRequest(new { message = "First name and last name are required" });
-            }
-
-            // Check if user already exists
-            var existingUser = await _dbContext.Users
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
-
-            if (existingUser != null)
-            {
-                return BadRequest(new { message = "Email already exists" });
-            }
-
-            var user = new User
-            {
-                Id = Guid.NewGuid(),
                 Email = request.Email,
+                Password = request.Password,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
-                Phone = request.Phone ?? string.Empty,
-                Role = "User",
-                IsActive = true,
-                OrganizationId = request.OrganizationId,
-                CreatedAt = DateTime.UtcNow
+                Phone = request.Phone,
+                OrganizationId = request.OrganizationId
             };
 
-            user.SetPassword(request.Password);
+            var result = await service.ExecuteAsync(model, cancellationToken);
 
-            _dbContext.Users.Add(user);
-            await _dbContext.SaveChangesAsync();
+            if (!result.IsSuccess)
+            {
+                if (result.Status == Ardalis.Result.ResultStatus.Invalid)
+                    return BadRequest(new { message = result.ValidationErrors.FirstOrDefault()?.ErrorMessage });
+                if (result.Status == Ardalis.Result.ResultStatus.Conflict)
+                    return BadRequest(new { message = "Email already exists" });
+                return BadRequest(new { message = result.Errors.FirstOrDefault() });
+            }
 
-            _logger.LogInformation("New user registered: {Email}", user.Email);
+            _logger.LogInformation("New user registered: {Email}", result.Value.Email);
 
-            return Ok(new { message = "Registration successful", userId = user.Id });
+            return Ok(new { message = "Registration successful", userId = result.Value.UserId });
         }
         catch (Exception ex)
         {
@@ -206,53 +195,52 @@ public class SimpleAuthController : ControllerBase
     }
 
     [HttpPost("forgot-password")]
-    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    public async Task<IActionResult> ForgotPassword(
+        [FromBody] ForgotPasswordRequest request,
+        [FromServices] AuthForgotPasswordService service,
+        CancellationToken cancellationToken)
     {
         try
         {
-            if (string.IsNullOrEmpty(request.Email))
+            var model = new AuthForgotPasswordModel
             {
-                return BadRequest(new { message = "L'email est requis" });
-            }
+                Email = request.Email
+            };
 
-            var user = await _dbContext.Users
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
+            var result = await service.ExecuteAsync(model, cancellationToken);
 
             // Always return success to prevent email enumeration
-            if (user == null)
+            if (!result.IsSuccess)
             {
+                if (result.Status == Ardalis.Result.ResultStatus.Invalid)
+                    return BadRequest(new { message = result.ValidationErrors.FirstOrDefault()?.ErrorMessage });
                 _logger.LogWarning("Forgot password requested for non-existent email: {Email}", request.Email);
-                return Ok(new { message = "Si l'email existe, un lien de réinitialisation a été envoyé." });
+            }
+            else if (result.Value != null && !string.IsNullOrEmpty(result.Value.Token))
+            {
+                // Send reset email
+                var resetLink = $"http://localhost:5173/reset-password?token={result.Value.Token}";
+                var emailContent = $@"
+                    <h2>Réinitialisation de mot de passe</h2>
+                    <p>Bonjour {result.Value.FirstName},</p>
+                    <p>Vous avez demandé une réinitialisation de votre mot de passe.</p>
+                    <p>Cliquez sur le lien ci-dessous pour réinitialiser votre mot de passe :</p>
+                    <p><a href='{resetLink}'>Réinitialiser mon mot de passe</a></p>
+                    <p>Ce lien expirera dans 1 heure.</p>
+                    <p>Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
+                    <br>
+                    <p>Cordialement,<br>L'équipe SDIA</p>
+                ";
+
+                await _emailService.SendEmailAsync(
+                    result.Value.Email,
+                    "Réinitialisation de votre mot de passe SDIA",
+                    emailContent
+                );
+
+                _logger.LogInformation("Password reset email sent to {Email}", result.Value.Email);
             }
 
-            // Generate secure reset token
-            var token = GenerateSecureToken();
-            user.PasswordResetToken = token;
-            user.PasswordResetExpiry = DateTime.UtcNow.AddHours(1);
-
-            await _dbContext.SaveChangesAsync();
-
-            // Send reset email
-            var resetLink = $"http://localhost:5173/reset-password?token={token}";
-            var emailContent = $@"
-                <h2>Réinitialisation de mot de passe</h2>
-                <p>Bonjour {user.FirstName},</p>
-                <p>Vous avez demandé une réinitialisation de votre mot de passe.</p>
-                <p>Cliquez sur le lien ci-dessous pour réinitialiser votre mot de passe :</p>
-                <p><a href='{resetLink}'>Réinitialiser mon mot de passe</a></p>
-                <p>Ce lien expirera dans 1 heure.</p>
-                <p>Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
-                <br>
-                <p>Cordialement,<br>L'équipe SDIA</p>
-            ";
-
-            await _emailService.SendEmailAsync(
-                user.Email,
-                "Réinitialisation de votre mot de passe SDIA",
-                emailContent
-            );
-
-            _logger.LogInformation("Password reset email sent to {Email}", user.Email);
             return Ok(new { message = "Si l'email existe, un lien de réinitialisation a été envoyé." });
         }
         catch (Exception ex)
@@ -263,39 +251,34 @@ public class SimpleAuthController : ControllerBase
     }
 
     [HttpPost("reset-password")]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    public async Task<IActionResult> ResetPassword(
+        [FromBody] ResetPasswordRequest request,
+        [FromServices] AuthResetPasswordService service,
+        CancellationToken cancellationToken)
     {
         try
         {
-            if (string.IsNullOrEmpty(request.Token) || string.IsNullOrEmpty(request.NewPassword))
+            var model = new AuthResetPasswordModel
             {
-                return BadRequest(new { message = "Token et nouveau mot de passe requis" });
+                Token = request.Token,
+                NewPassword = request.NewPassword
+            };
+
+            var result = await service.ExecuteAsync(model, cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                if (result.Status == Ardalis.Result.ResultStatus.Invalid)
+                    return BadRequest(new { message = result.ValidationErrors.FirstOrDefault()?.ErrorMessage });
+                if (result.Status == Ardalis.Result.ResultStatus.NotFound)
+                {
+                    _logger.LogWarning("Invalid reset token used: {Token}", request.Token);
+                    return BadRequest(new { message = "Token invalide ou expiré" });
+                }
+                return BadRequest(new { message = result.Errors.FirstOrDefault() });
             }
 
-            var user = await _dbContext.Users
-                .FirstOrDefaultAsync(u => u.PasswordResetToken == request.Token);
-
-            if (user == null)
-            {
-                _logger.LogWarning("Invalid reset token used: {Token}", request.Token);
-                return BadRequest(new { message = "Token invalide ou expiré" });
-            }
-
-            if (user.PasswordResetExpiry == null || user.PasswordResetExpiry < DateTime.UtcNow)
-            {
-                _logger.LogWarning("Expired reset token used for user: {Email}", user.Email);
-                return BadRequest(new { message = "Token invalide ou expiré" });
-            }
-
-            // Reset password
-            user.SetPassword(request.NewPassword);
-            user.PasswordResetToken = string.Empty;
-            user.PasswordResetExpiry = null;
-            user.UpdatedAt = DateTime.UtcNow;
-
-            await _dbContext.SaveChangesAsync();
-
-            _logger.LogInformation("Password successfully reset for user: {Email}", user.Email);
+            _logger.LogInformation("Password successfully reset for user: {Email}", result.Value.Email);
             return Ok(new { message = "Mot de passe réinitialisé avec succès" });
         }
         catch (Exception ex)
@@ -306,35 +289,34 @@ public class SimpleAuthController : ControllerBase
     }
 
     [HttpGet("validate-reset-token")]
-    public async Task<IActionResult> ValidateResetToken([FromQuery] string token)
+    public async Task<IActionResult> ValidateResetToken(
+        [FromQuery] string token,
+        [FromServices] AuthValidateResetTokenService service,
+        CancellationToken cancellationToken)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(token))
+            var model = new AuthValidateResetTokenModel
+            {
+                Token = token
+            };
+
+            var result = await service.ExecuteAsync(model, cancellationToken);
+
+            if (!result.IsSuccess)
             {
                 return Ok(new { isValid = false });
             }
 
-            var user = await _dbContext.Users
-                .FirstOrDefaultAsync(u => u.PasswordResetToken == token);
-
-            if (user == null)
+            if (!result.Value.IsValid)
             {
-                _logger.LogWarning("Invalid reset token validation attempt: {Token}", token);
-                return Ok(new { isValid = false });
+                _logger.LogWarning("Invalid or expired reset token validation: {Token}", token);
             }
 
-            var isValid = user.PasswordResetExpiry != null && user.PasswordResetExpiry > DateTime.UtcNow;
-
-            if (!isValid)
+            return Ok(new
             {
-                _logger.LogWarning("Expired reset token validation for user: {Email}", user.Email);
-            }
-
-            return Ok(new 
-            { 
-                isValid = isValid,
-                email = isValid ? user.Email : string.Empty
+                isValid = result.Value.IsValid,
+                email = result.Value.IsValid ? result.Value.Email : string.Empty
             });
         }
         catch (Exception ex)
@@ -344,14 +326,4 @@ public class SimpleAuthController : ControllerBase
         }
     }
 
-    private static string GenerateSecureToken()
-    {
-        var randomBytes = new byte[32];
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(randomBytes);
-        return Convert.ToBase64String(randomBytes)
-            .Replace("+", "-")
-            .Replace("/", "_")
-            .Replace("=", "");
-    }
 }

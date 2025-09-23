@@ -59,7 +59,11 @@
       "Bash(dir C:FilesProjectsASKapp-starter-kit)",
       "Read(//c/Files/Projects/ASK/app-starter-kit/**)",
       "Bash(python:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(npx:*)",
+      "Bash(dotnet ef dbcontext list:*)",
+      "Bash(dir:*)",
+      "Bash(del AuthRegisterResult.cs)"
     ],
     "deny": [],
     "ask": []
